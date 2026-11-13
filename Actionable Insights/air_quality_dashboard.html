@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Air Quality &amp; PM2.5 Risk Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #f4f6f8;
+      --bg-card: #ffffff;
+      --bg-header: #14213d;
+      --text-primary: #1f2933;
+      --text-secondary: #64748b;
+      --text-on-dark: #ffffff;
+      --border: #e2e8f0;
+      --color-1: #4C72B0;
+      --color-2: #DD8452;
+      --color-4: #C44E52;
+      --positive: #2e7d32;
+      --negative: #c62828;
+      --gap: 16px;
+      --radius: 10px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .dashboard-container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: var(--gap);
+    }
+
+    .dashboard-header {
+      background: var(--bg-header);
+      color: var(--text-on-dark);
+      padding: 22px 26px;
+      border-radius: var(--radius);
+      margin-bottom: var(--gap);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .dashboard-header h1 {
+      font-size: 21px;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.68);
+      margin-top: 3px;
+    }
+
+    .filters {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .filter-group label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .filter-group select,
+    .filter-group input[type="date"] {
+      padding: 7px 9px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-on-dark);
+      font-size: 12.5px;
+      color-scheme: dark;
+    }
+
+    .filter-group select option {
+      background: var(--bg-header);
+      color: var(--text-on-dark);
+    }
+
+    .reset-btn {
+      padding: 7px 13px;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-on-dark);
+      font-size: 12.5px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .reset-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: var(--gap);
+      margin-bottom: var(--gap);
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      border: 1px solid var(--border);
+    }
+
+    .kpi-label {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 600;
+    }
+
+    .kpi-value {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 5px 0 2px;
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .kpi-value.critical {
+      color: var(--negative);
+    }
+
+    .chart-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: var(--gap);
+      margin-bottom: var(--gap);
+    }
+
+    .chart-container {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      border: 1px solid var(--border);
+      min-width: 0;
+    }
+
+    .chart-container h3 {
+      font-size: 13.5px;
+      font-weight: 650;
+      margin-bottom: 12px;
+    }
+
+    .chart-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .chart-note {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .chart-body {
+      position: relative;
+      height: 300px;
+    }
+
+    .chart-wide .chart-body {
+      height: 380px;
+    }
+
+    .chart-full {
+      grid-column: 1 / -1;
+    }
+
+    .table-section {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      border: 1px solid var(--border);
+      overflow-x: auto;
+    }
+
+    .table-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .table-head h3 {
+      font-size: 13.5px;
+      font-weight: 650;
+    }
+
+    #table-info {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      min-width: 760px;
+    }
+
+    .data-table thead th {
+      text-align: left;
+      padding: 9px 11px;
+      border-bottom: 2px solid var(--border);
+      color: var(--text-secondary);
+      font-weight: 650;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .data-table thead th:hover {
+      color: var(--text-primary);
+      background: #f8fafc;
+    }
+
+    .data-table tbody td {
+      padding: 9px 11px;
+      border-bottom: 1px solid #f1f5f9;
+      white-space: nowrap;
+    }
+
+    .data-table tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    .data-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .badge-low {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .badge-medium {
+      background: #fff8e1;
+      color: #a16207;
+    }
+
+    .badge-high {
+      background: #fff3e0;
+      color: #c2410c;
+    }
+
+    .badge-critical {
+      background: #ffebee;
+      color: #c62828;
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+    }
+
+    .pagination button {
+      padding: 5px 11px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text-primary);
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+
+    .pagination button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    .dashboard-footer {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      padding: 16px 4px 4px;
+    }
+
+    @media (max-width: 820px) {
+      .dashboard-header {
+        flex-direction: column;
+      }
+
+      .filters {
+        width: 100%;
+      }
+
+      .kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .chart-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .kpi-row {
+        grid-template-columns: 1fr;
+      }
+
+      .dashboard-container {
+        padding: 10px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .dashboard-container {
+        max-width: none;
+      }
+
+      .filters,
+      .pagination {
+        display: none;
+      }
+
+      .chart-container,
+      .kpi-card,
+      .table-section {
+        break-inside: avoid;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="dashboard-container">
+    <header class="dashboard-header">
+      <div>
+        <h1>Air Quality &amp; PM2.5 Risk Dashboard</h1>
+        <p class="subtitle">500 daily observations · Jan 2023 – May 2024 · PM2.5 target with seasonal, weekday and risk
+          insights</p>
+      </div>
+      <div class="filters">
+        <div class="filter-group">
+          <label for="filter-season">Season</label>
+          <select id="filter-season">
+            <option value="all">All Seasons</option>
+            <option value="Spring">Spring</option>
+            <option value="Winter">Winter</option>
+            <option value="Summer">Summer</option>
+            <option value="Autumn">Autumn</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-risk">Risk</label>
+          <select id="filter-risk">
+            <option value="all">All Levels</option>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+            <option value="Critical">Critical</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-month">Month</label>
+          <select id="filter-month">
+            <option value="all">All Months</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-year">Year</label>
+          <select id="filter-year">
+            <option value="all">All Years</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-start">From</label>
+          <input type="date" id="filter-start">
+        </div>
+        <div class="filter-group">
+          <label for="filter-end">To</label>
+          <input type="date" id="filter-end">
+        </div>
+        <button class="reset-btn" id="reset-filters">Reset</button>
+      </div>
+    </header>
+
+    <section class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Days in View</div>
+        <div class="kpi-value" id="kpi-days">0</div>
+        <div class="kpi-sub" id="kpi-days-sub">of 500 total rows</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Average PM2.5</div>
+        <div class="kpi-value" id="kpi-avg">0</div>
+        <div class="kpi-sub" id="kpi-avg-sub">µg/m³ · filtered view</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Peak PM2.5</div>
+        <div class="kpi-value" id="kpi-peak">0</div>
+        <div class="kpi-sub" id="kpi-peak-sub">µg/m³ · single-day max</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Critical Days</div>
+        <div class="kpi-value critical" id="kpi-critical">0</div>
+        <div class="kpi-sub" id="kpi-critical-sub">0% of days</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Average Risk Score</div>
+        <div class="kpi-value" id="kpi-risk">0.00</div>
+        <div class="kpi-sub" id="kpi-risk-sub">0% High + Critical</div>
+      </div>
+    </section>
+
+    <section class="chart-row chart-wide">
+      <div class="chart-container chart-full">
+        <div class="chart-head">
+          <h3>Daily PM2.5 Trend</h3>
+          <span class="chart-note">Dashed lines mark the 75 and 100 µg/m³ alert thresholds</span>
+        </div>
+        <div class="chart-body"><canvas id="trend-chart"></canvas></div>
+      </div>
+    </section>
+
+    <section class="chart-row">
+      <div class="chart-container">
+        <h3>Average PM2.5 by Season</h3>
+        <div class="chart-body"><canvas id="season-chart"></canvas></div>
+      </div>
+      <div class="chart-container">
+        <h3>Risk Category Distribution</h3>
+        <div class="chart-body"><canvas id="risk-chart"></canvas></div>
+      </div>
+      <div class="chart-container">
+        <h3>Average PM2.5 by Weekday</h3>
+        <div class="chart-body"><canvas id="weekday-chart"></canvas></div>
+      </div>
+    </section>
+
+    <section class="chart-row">
+      <div class="chart-container chart-full">
+        <h3>Monthly Average PM2.5</h3>
+        <div class="chart-body"><canvas id="month-chart"></canvas></div>
+      </div>
+    </section>
+
+    <section class="table-section">
+      <div class="table-head">
+        <h3>Daily Detail</h3>
+        <span id="table-info"></span>
+      </div>
+      <div id="table-container"></div>
+      <div class="pagination">
+        <button id="page-prev">Previous</button>
+        <span id="page-label"></span>
+        <button id="page-next">Next</button>
+      </div>
+    </section>
+
+    <footer class="dashboard-footer">
+      <span>Data as of: <span id="data-date">2024-05-14</span></span>
+      <span>Timestamps synthesized from row order · Risk score is a relative index, not a regulatory AQI</span>
+    </footer>
+  </div>
+
+  <script>
+    const DATA = [{ "date": "2023-01-01", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Sun", "season": "Winter", "pm25": 39.97, "pm10": 57.93, "co": 2.79, "nox": 116.19, "no2": 55.23, "so2": 4.53, "vocs": 75.32, "co2": 427.67, "ch4": 1.71, "temp": 31.09, "riskScore": 0.3194, "risk": "Low" }, { "date": "2023-01-02", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Mon", "season": "Winter", "pm25": 101.94, "pm10": 150.77, "co": 1.97, "nox": 76.83, "no2": 79.05, "so2": 18.74, "vocs": 145.08, "co2": 529.74, "ch4": 2.49, "temp": 33.71, "riskScore": 0.7229, "risk": "Critical" }, { "date": "2023-01-03", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Tue", "season": "Winter", "pm25": 71.0, "pm10": 138.95, "co": 2.63, "nox": 158.73, "no2": 60.47, "so2": 14.89, "vocs": 145.15, "co2": 499.89, "ch4": 2.43, "temp": 33.78, "riskScore": 0.598, "risk": "High" }, { "date": "2023-01-04", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Wed", "season": "Winter", "pm25": 28.46, "pm10": 63.64, "co": 1.78, "nox": 25.39, "no2": 15.33, "so2": 7.65, "vocs": 130.02, "co2": 388.28, "ch4": 1.82, "temp": 31.57, "riskScore": 0.2354, "risk": "Low" }, { "date": "2023-01-05", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Thu", "season": "Winter", "pm25": 78.27, "pm10": 113.98, "co": 3.24, "nox": 105.64, "no2": 59.2, "so2": 17.7, "vocs": 181.71, "co2": 464.74, "ch4": 2.6, "temp": 32.23, "riskScore": 0.6096, "risk": "High" }, { "date": "2023-01-06", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Fri", "season": "Winter", "pm25": 16.24, "pm10": 39.5, "co": 2.11, "nox": 115.91, "no2": 30.93, "so2": 5.95, "vocs": 106.07, "co2": 425.97, "ch4": 1.62, "temp": 29.78, "riskScore": 0.1522, "risk": "Low" }, { "date": "2023-01-07", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Sat", "season": "Winter", "pm25": 97.7, "pm10": 102.04, "co": 3.68, "nox": 175.04, "no2": 74.45, "so2": 14.81, "vocs": 147.73, "co2": 515.91, "ch4": 2.95, "temp": 33.68, "riskScore": 0.69, "risk": "Critical" }, { "date": "2023-01-08", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Sun", "season": "Winter", "pm25": 74.02, "pm10": 118.78, "co": 2.63, "nox": 107.44, "no2": 85.64, "so2": 24.52, "vocs": 150.57, "co2": 470.1, "ch4": 2.26, "temp": 34.49, "riskScore": 0.5728, "risk": "Medium" }, { "date": "2023-01-09", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Mon", "season": "Winter", "pm25": 53.46, "pm10": 76.5, "co": 1.33, "nox": 15.33, "no2": 19.46, "so2": 7.79, "vocs": 76.12, "co2": 376.01, "ch4": 1.93, "temp": 30.25, "riskScore": 0.3465, "risk": "Medium" }, { "date": "2023-01-10", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Tue", "season": "Winter", "pm25": 41.9, "pm10": 78.3, "co": 2.28, "nox": 16.51, "no2": 9.9, "so2": 8.25, "vocs": 68.76, "co2": 388.47, "ch4": 1.82, "temp": 25.55, "riskScore": 0.3431, "risk": "Medium" }, { "date": "2023-01-11", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Wed", "season": "Winter", "pm25": 67.63, "pm10": 73.14, "co": 1.52, "nox": 32.58, "no2": 14.63, "so2": 4.16, "vocs": 99.34, "co2": 414.63, "ch4": 1.96, "temp": 28.9, "riskScore": 0.4094, "risk": "Medium" }, { "date": "2023-01-12", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Thu", "season": "Winter", "pm25": 54.65, "pm10": 30.9, "co": 1.93, "nox": 80.93, "no2": 41.69, "so2": 2.36, "vocs": 66.64, "co2": 434.01, "ch4": 1.79, "temp": 30.43, "riskScore": 0.2924, "risk": "Low" }, { "date": "2023-01-13", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Fri", "season": "Winter", "pm25": 72.6, "pm10": 138.46, "co": 3.45, "nox": 201.2, "no2": 83.1, "so2": 20.05, "vocs": 139.03, "co2": 475.54, "ch4": 2.66, "temp": 31.17, "riskScore": 0.6413, "risk": "High" }, { "date": "2023-01-14", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Sat", "season": "Winter", "pm25": 87.23, "pm10": 138.53, "co": 2.56, "nox": 124.87, "no2": 80.16, "so2": 29.36, "vocs": 161.89, "co2": 489.55, "ch4": 2.5, "temp": 33.76, "riskScore": 0.6637, "risk": "Critical" }, { "date": "2023-01-15", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Sun", "season": "Winter", "pm25": 35.63, "pm10": 67.52, "co": 2.05, "nox": 96.33, "no2": 41.81, "so2": 6.93, "vocs": 58.7, "co2": 421.06, "ch4": 1.98, "temp": 29.55, "riskScore": 0.2858, "risk": "Low" }, { "date": "2023-01-16", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Mon", "season": "Winter", "pm25": 65.6, "pm10": 142.1, "co": 3.22, "nox": 169.03, "no2": 115.92, "so2": 13.41, "vocs": 171.61, "co2": 501.19, "ch4": 2.77, "temp": 32.94, "riskScore": 0.6077, "risk": "High" }, { "date": "2023-01-17", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Tue", "season": "Winter", "pm25": 77.81, "pm10": 71.69, "co": 1.52, "nox": 15.94, "no2": 14.83, "so2": 6.07, "vocs": 124.43, "co2": 388.63, "ch4": 1.98, "temp": 30.22, "riskScore": 0.4499, "risk": "Medium" }, { "date": "2023-01-18", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Wed", "season": "Winter", "pm25": 48.52, "pm10": 57.14, "co": 1.11, "nox": 48.66, "no2": 17.37, "so2": 5.62, "vocs": 116.41, "co2": 397.87, "ch4": 2.23, "temp": 25.54, "riskScore": 0.2787, "risk": "Low" }, { "date": "2023-01-19", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Thu", "season": "Winter", "pm25": 65.76, "pm10": 108.06, "co": 2.2, "nox": 146.66, "no2": 43.76, "so2": 13.29, "vocs": 101.35, "co2": 527.79, "ch4": 2.24, "temp": 30.95, "riskScore": 0.4978, "risk": "Medium" }, { "date": "2023-01-20", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Fri", "season": "Winter", "pm25": 58.0, "pm10": 88.97, "co": 1.71, "nox": 16.22, "no2": 10.31, "so2": 9.03, "vocs": 112.84, "co2": 428.53, "ch4": 2.11, "temp": 31.41, "riskScore": 0.4063, "risk": "Medium" }, { "date": "2023-01-21", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Sat", "season": "Winter", "pm25": 75.27, "pm10": 135.18, "co": 4.62, "nox": 126.82, "no2": 66.45, "so2": 17.57, "vocs": 152.46, "co2": 462.65, "ch4": 2.71, "temp": 29.77, "riskScore": 0.6991, "risk": "Critical" }, { "date": "2023-01-22", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Sun", "season": "Winter", "pm25": 15.08, "pm10": 66.39, "co": 1.8, "nox": 86.47, "no2": 47.77, "so2": 4.9, "vocs": 90.37, "co2": 424.38, "ch4": 2.13, "temp": 28.52, "riskScore": 0.1845, "risk": "Low" }, { "date": "2023-01-23", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Mon", "season": "Winter", "pm25": 80.23, "pm10": 128.84, "co": 2.46, "nox": 181.44, "no2": 60.57, "so2": 17.78, "vocs": 99.93, "co2": 533.23, "ch4": 2.4, "temp": 32.36, "riskScore": 0.6108, "risk": "High" }, { "date": "2023-01-24", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Tue", "season": "Winter", "pm25": 36.84, "pm10": 68.67, "co": 2.04, "nox": 153.37, "no2": 42.27, "so2": 8.31, "vocs": 70.74, "co2": 414.07, "ch4": 1.66, "temp": 29.47, "riskScore": 0.2926, "risk": "Low" }, { "date": "2023-01-25", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Wed", "season": "Winter", "pm25": 50.33, "pm10": 83.94, "co": 1.4, "nox": 20.73, "no2": 14.7, "so2": 1.52, "vocs": 74.39, "co2": 377.52, "ch4": 2.33, "temp": 23.71, "riskScore": 0.3501, "risk": "Medium" }, { "date": "2023-01-26", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Thu", "season": "Winter", "pm25": 45.02, "pm10": 83.61, "co": 1.97, "nox": 49.34, "no2": 17.07, "so2": 9.14, "vocs": 103.7, "co2": 395.31, "ch4": 2.15, "temp": 33.43, "riskScore": 0.3525, "risk": "Medium" }, { "date": "2023-01-27", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Fri", "season": "Winter", "pm25": 86.69, "pm10": 142.72, "co": 2.62, "nox": 165.04, "no2": 85.91, "so2": 16.66, "vocs": 123.96, "co2": 474.65, "ch4": 2.53, "temp": 32.14, "riskScore": 0.6719, "risk": "Critical" }, { "date": "2023-01-28", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Sat", "season": "Winter", "pm25": 93.27, "pm10": 110.71, "co": 3.25, "nox": 131.33, "no2": 64.67, "so2": 24.76, "vocs": 193.58, "co2": 511.63, "ch4": 2.31, "temp": 34.75, "riskScore": 0.6682, "risk": "Critical" }, { "date": "2023-01-29", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Sun", "season": "Winter", "pm25": 104.16, "pm10": 130.56, "co": 1.93, "nox": 138.97, "no2": 61.78, "so2": 25.22, "vocs": 156.87, "co2": 507.26, "ch4": 2.84, "temp": 34.72, "riskScore": 0.6924, "risk": "Critical" }, { "date": "2023-01-30", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Mon", "season": "Winter", "pm25": 80.18, "pm10": 138.62, "co": 2.81, "nox": 134.3, "no2": 84.24, "so2": 18.8, "vocs": 175.62, "co2": 487.74, "ch4": 3.07, "temp": 35.13, "riskScore": 0.645, "risk": "High" }, { "date": "2023-01-31", "year": 2023, "month": 1, "monthLabel": "Jan 2023", "dow": "Tue", "season": "Winter", "pm25": 58.48, "pm10": 108.58, "co": 1.86, "nox": 26.57, "no2": 16.25, "so2": 8.65, "vocs": 141.88, "co2": 394.96, "ch4": 2.01, "temp": 28.18, "riskScore": 0.4522, "risk": "Medium" }, { "date": "2023-02-01", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Wed", "season": "Winter", "pm25": 30.29, "pm10": 63.48, "co": 2.16, "nox": 63.8, "no2": 25.93, "so2": 3.56, "vocs": 75.73, "co2": 434.75, "ch4": 1.97, "temp": 29.68, "riskScore": 0.2599, "risk": "Low" }, { "date": "2023-02-02", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Thu", "season": "Winter", "pm25": 44.78, "pm10": 64.8, "co": 1.46, "nox": 33.23, "no2": 10.86, "so2": 9.04, "vocs": 138.32, "co2": 394.02, "ch4": 2.14, "temp": 26.8, "riskScore": 0.2928, "risk": "Low" }, { "date": "2023-02-03", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Fri", "season": "Winter", "pm25": 51.55, "pm10": 131.98, "co": 2.67, "nox": 144.96, "no2": 74.28, "so2": 17.64, "vocs": 156.52, "co2": 488.88, "ch4": 2.23, "temp": 36.05, "riskScore": 0.5035, "risk": "Medium" }, { "date": "2023-02-04", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Sat", "season": "Winter", "pm25": 34.49, "pm10": 65.77, "co": 1.2, "nox": 20.13, "no2": 12.54, "so2": 5.58, "vocs": 139.73, "co2": 381.25, "ch4": 1.73, "temp": 25.69, "riskScore": 0.2389, "risk": "Low" }, { "date": "2023-02-05", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Sun", "season": "Winter", "pm25": 37.26, "pm10": 41.19, "co": 1.81, "nox": 14.85, "no2": 18.4, "so2": 7.75, "vocs": 116.22, "co2": 391.51, "ch4": 1.75, "temp": 28.57, "riskScore": 0.232, "risk": "Low" }, { "date": "2023-02-06", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Mon", "season": "Winter", "pm25": 49.09, "pm10": 69.75, "co": 1.22, "nox": 43.72, "no2": 11.61, "so2": 10.31, "vocs": 90.62, "co2": 391.1, "ch4": 2.07, "temp": 33.73, "riskScore": 0.31, "risk": "Low" }, { "date": "2023-02-07", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Tue", "season": "Winter", "pm25": 50.16, "pm10": 64.69, "co": 2.53, "nox": 92.17, "no2": 24.01, "so2": 2.26, "vocs": 90.71, "co2": 435.41, "ch4": 1.63, "temp": 29.39, "riskScore": 0.3641, "risk": "Medium" }, { "date": "2023-02-08", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Wed", "season": "Winter", "pm25": 99.13, "pm10": 118.17, "co": 1.17, "nox": 178.11, "no2": 61.46, "so2": 22.07, "vocs": 190.26, "co2": 486.9, "ch4": 2.68, "temp": 35.43, "riskScore": 0.6135, "risk": "High" }, { "date": "2023-02-09", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Thu", "season": "Winter", "pm25": 45.58, "pm10": 33.62, "co": 2.75, "nox": 70.42, "no2": 19.61, "so2": 4.46, "vocs": 94.35, "co2": 420.74, "ch4": 2.13, "temp": 27.24, "riskScore": 0.2957, "risk": "Low" }, { "date": "2023-02-10", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Fri", "season": "Winter", "pm25": 42.66, "pm10": 95.55, "co": 1.65, "nox": 34.61, "no2": 17.93, "so2": 4.95, "vocs": 130.15, "co2": 376.28, "ch4": 2.1, "temp": 21.81, "riskScore": 0.3506, "risk": "Medium" }, { "date": "2023-02-11", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Sat", "season": "Winter", "pm25": 31.78, "pm10": 78.78, "co": 1.32, "nox": 37.47, "no2": 13.55, "so2": 12.11, "vocs": 92.02, "co2": 385.24, "ch4": 1.84, "temp": 26.32, "riskScore": 0.2575, "risk": "Low" }, { "date": "2023-02-12", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Sun", "season": "Winter", "pm25": 47.81, "pm10": 130.26, "co": 3.09, "nox": 113.45, "no2": 52.6, "so2": 19.79, "vocs": 123.0, "co2": 539.47, "ch4": 2.39, "temp": 30.88, "riskScore": 0.5031, "risk": "Medium" }, { "date": "2023-02-13", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Mon", "season": "Winter", "pm25": 89.21, "pm10": 135.15, "co": 1.94, "nox": 134.08, "no2": 61.36, "so2": 18.62, "vocs": 80.94, "co2": 527.34, "ch4": 2.99, "temp": 32.5, "riskScore": 0.6377, "risk": "High" }, { "date": "2023-02-14", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Tue", "season": "Winter", "pm25": 49.8, "pm10": 55.88, "co": 1.62, "nox": 34.72, "no2": 18.26, "so2": 5.66, "vocs": 58.52, "co2": 385.11, "ch4": 2.05, "temp": 24.13, "riskScore": 0.3047, "risk": "Low" }, { "date": "2023-02-15", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Wed", "season": "Winter", "pm25": 68.4, "pm10": 112.98, "co": 2.39, "nox": 156.55, "no2": 83.66, "so2": 25.28, "vocs": 169.61, "co2": 499.93, "ch4": 3.21, "temp": 35.03, "riskScore": 0.527, "risk": "Medium" }, { "date": "2023-02-16", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Thu", "season": "Winter", "pm25": 40.34, "pm10": 57.97, "co": 1.51, "nox": 43.96, "no2": 8.45, "so2": 4.17, "vocs": 123.53, "co2": 391.27, "ch4": 1.93, "temp": 27.28, "riskScore": 0.2634, "risk": "Low" }, { "date": "2023-02-17", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Fri", "season": "Winter", "pm25": 40.42, "pm10": 62.56, "co": 1.66, "nox": 21.71, "no2": 12.27, "so2": 2.99, "vocs": 117.12, "co2": 389.15, "ch4": 2.05, "temp": 28.82, "riskScore": 0.2789, "risk": "Low" }, { "date": "2023-02-18", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Sat", "season": "Winter", "pm25": 81.49, "pm10": 135.03, "co": 2.47, "nox": 99.92, "no2": 78.15, "so2": 16.69, "vocs": 167.12, "co2": 463.9, "ch4": 2.01, "temp": 33.1, "riskScore": 0.6282, "risk": "High" }, { "date": "2023-02-19", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Sun", "season": "Winter", "pm25": 32.87, "pm10": 62.08, "co": 1.63, "nox": 119.11, "no2": 40.11, "so2": 6.76, "vocs": 46.3, "co2": 398.61, "ch4": 2.2, "temp": 33.97, "riskScore": 0.2443, "risk": "Low" }, { "date": "2023-02-20", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Mon", "season": "Winter", "pm25": 37.78, "pm10": 83.68, "co": 0.79, "nox": 41.06, "no2": 18.86, "so2": 6.55, "vocs": 160.85, "co2": 379.67, "ch4": 2.03, "temp": 28.27, "riskScore": 0.2686, "risk": "Low" }, { "date": "2023-02-21", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Tue", "season": "Winter", "pm25": 47.2, "pm10": 76.36, "co": 1.27, "nox": 35.32, "no2": 18.48, "so2": 9.03, "vocs": 111.89, "co2": 383.19, "ch4": 2.15, "temp": 28.73, "riskScore": 0.3166, "risk": "Low" }, { "date": "2023-02-22", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Wed", "season": "Winter", "pm25": 98.02, "pm10": 111.84, "co": 3.01, "nox": 88.86, "no2": 54.88, "so2": 10.65, "vocs": 139.45, "co2": 533.53, "ch4": 2.6, "temp": 32.56, "riskScore": 0.6798, "risk": "Critical" }, { "date": "2023-02-23", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Thu", "season": "Winter", "pm25": 47.83, "pm10": 83.88, "co": 1.75, "nox": 15.21, "no2": 20.72, "so2": 8.68, "vocs": 89.62, "co2": 412.71, "ch4": 2.04, "temp": 28.74, "riskScore": 0.3553, "risk": "Medium" }, { "date": "2023-02-24", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Fri", "season": "Winter", "pm25": 56.64, "pm10": 82.97, "co": 1.34, "nox": 26.48, "no2": 12.87, "so2": 7.9, "vocs": 146.02, "co2": 392.61, "ch4": 1.55, "temp": 30.03, "riskScore": 0.3726, "risk": "Medium" }, { "date": "2023-02-25", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Sat", "season": "Winter", "pm25": 127.62, "pm10": 123.64, "co": 3.5, "nox": 72.81, "no2": 64.22, "so2": 26.65, "vocs": 209.98, "co2": 531.35, "ch4": 2.15, "temp": 31.64, "riskScore": 0.8508, "risk": "Critical" }, { "date": "2023-02-26", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Sun", "season": "Winter", "pm25": 47.17, "pm10": 117.58, "co": 1.59, "nox": 27.97, "no2": 15.23, "so2": 11.56, "vocs": 114.76, "co2": 394.42, "ch4": 2.05, "temp": 24.58, "riskScore": 0.4087, "risk": "Medium" }, { "date": "2023-02-27", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Mon", "season": "Winter", "pm25": 36.84, "pm10": 61.5, "co": 1.71, "nox": 97.74, "no2": 47.81, "so2": 10.08, "vocs": 90.48, "co2": 418.67, "ch4": 2.01, "temp": 28.83, "riskScore": 0.2639, "risk": "Low" }, { "date": "2023-02-28", "year": 2023, "month": 2, "monthLabel": "Feb 2023", "dow": "Tue", "season": "Winter", "pm25": 55.23, "pm10": 28.23, "co": 0.9, "nox": 27.7, "no2": 18.14, "so2": 10.54, "vocs": 79.54, "co2": 387.39, "ch4": 1.77, "temp": 27.55, "riskScore": 0.2432, "risk": "Low" }, { "date": "2023-03-01", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Wed", "season": "Spring", "pm25": 92.07, "pm10": 116.86, "co": 2.44, "nox": 182.41, "no2": 42.33, "so2": 14.91, "vocs": 165.5, "co2": 496.71, "ch4": 2.5, "temp": 33.32, "riskScore": 0.638, "risk": "High" }, { "date": "2023-03-02", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Thu", "season": "Spring", "pm25": 59.56, "pm10": 81.77, "co": 3.76, "nox": 132.99, "no2": 86.93, "so2": 31.28, "vocs": 132.79, "co2": 492.11, "ch4": 2.0, "temp": 34.4, "riskScore": 0.4921, "risk": "Medium" }, { "date": "2023-03-03", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Fri", "season": "Spring", "pm25": 26.58, "pm10": 120.33, "co": 1.54, "nox": 45.92, "no2": 14.91, "so2": 7.4, "vocs": 82.1, "co2": 388.16, "ch4": 2.1, "temp": 27.12, "riskScore": 0.3239, "risk": "Low" }, { "date": "2023-03-04", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Sat", "season": "Spring", "pm25": 41.92, "pm10": 88.44, "co": 0.82, "nox": 13.77, "no2": 16.7, "so2": 8.05, "vocs": 64.73, "co2": 400.1, "ch4": 2.19, "temp": 28.52, "riskScore": 0.2964, "risk": "Low" }, { "date": "2023-03-05", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Sun", "season": "Spring", "pm25": 32.6, "pm10": 54.38, "co": 1.46, "nox": 117.77, "no2": 44.44, "so2": 4.28, "vocs": 103.19, "co2": 426.16, "ch4": 1.92, "temp": 29.38, "riskScore": 0.2211, "risk": "Low" }, { "date": "2023-03-06", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Mon", "season": "Spring", "pm25": 41.89, "pm10": 67.0, "co": 2.5, "nox": 134.18, "no2": 49.58, "so2": 5.45, "vocs": 94.96, "co2": 414.93, "ch4": 1.73, "temp": 29.81, "riskScore": 0.3318, "risk": "Low" }, { "date": "2023-03-07", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Tue", "season": "Spring", "pm25": 59.96, "pm10": 30.94, "co": 1.37, "nox": 12.47, "no2": 12.28, "so2": 9.94, "vocs": 99.23, "co2": 403.46, "ch4": 2.43, "temp": 30.02, "riskScore": 0.2896, "risk": "Low" }, { "date": "2023-03-08", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Wed", "season": "Spring", "pm25": 32.99, "pm10": 103.37, "co": 1.5, "nox": 41.03, "no2": 20.76, "so2": 8.24, "vocs": 132.8, "co2": 403.59, "ch4": 1.97, "temp": 25.96, "riskScore": 0.3171, "risk": "Low" }, { "date": "2023-03-09", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Thu", "season": "Spring", "pm25": 83.84, "pm10": 139.65, "co": 2.56, "nox": 199.96, "no2": 85.22, "so2": 10.8, "vocs": 111.61, "co2": 500.52, "ch4": 2.66, "temp": 31.55, "riskScore": 0.6514, "risk": "High" }, { "date": "2023-03-10", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Fri", "season": "Spring", "pm25": 76.62, "pm10": 144.15, "co": 3.36, "nox": 156.91, "no2": 76.48, "so2": 22.71, "vocs": 153.99, "co2": 497.63, "ch4": 2.49, "temp": 30.76, "riskScore": 0.6652, "risk": "Critical" }, { "date": "2023-03-11", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Sat", "season": "Spring", "pm25": 41.08, "pm10": 37.21, "co": 1.82, "nox": 99.87, "no2": 33.41, "so2": 1.62, "vocs": 99.74, "co2": 422.43, "ch4": 1.84, "temp": 29.33, "riskScore": 0.2414, "risk": "Low" }, { "date": "2023-03-12", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Sun", "season": "Spring", "pm25": 56.63, "pm10": 111.99, "co": 1.77, "nox": 164.99, "no2": 77.99, "so2": 14.56, "vocs": 177.88, "co2": 522.88, "ch4": 2.1, "temp": 32.55, "riskScore": 0.4467, "risk": "Medium" }, { "date": "2023-03-13", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Mon", "season": "Spring", "pm25": 41.92, "pm10": 79.29, "co": 2.13, "nox": 120.12, "no2": 49.3, "so2": 5.08, "vocs": 80.23, "co2": 427.34, "ch4": 1.74, "temp": 30.24, "riskScore": 0.3385, "risk": "Medium" }, { "date": "2023-03-14", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Tue", "season": "Spring", "pm25": 86.44, "pm10": 124.15, "co": 2.97, "nox": 158.15, "no2": 50.85, "so2": 14.59, "vocs": 181.59, "co2": 513.63, "ch4": 2.51, "temp": 33.06, "riskScore": 0.6517, "risk": "High" }, { "date": "2023-03-15", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Wed", "season": "Spring", "pm25": 35.96, "pm10": 53.07, "co": 2.63, "nox": 89.14, "no2": 36.91, "so2": 5.44, "vocs": 70.43, "co2": 411.05, "ch4": 1.76, "temp": 29.12, "riskScore": 0.2857, "risk": "Low" }, { "date": "2023-03-16", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Thu", "season": "Spring", "pm25": 47.3, "pm10": 72.54, "co": 2.13, "nox": 33.82, "no2": 47.3, "so2": 4.56, "vocs": 99.92, "co2": 419.8, "ch4": 1.93, "temp": 29.66, "riskScore": 0.3485, "risk": "Medium" }, { "date": "2023-03-17", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Fri", "season": "Spring", "pm25": 98.35, "pm10": 106.33, "co": 1.82, "nox": 134.7, "no2": 32.73, "so2": 24.6, "vocs": 159.42, "co2": 464.83, "ch4": 2.24, "temp": 34.59, "riskScore": 0.6171, "risk": "High" }, { "date": "2023-03-18", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Sat", "season": "Spring", "pm25": 42.86, "pm10": 53.22, "co": 1.52, "nox": 116.68, "no2": 56.14, "so2": 5.92, "vocs": 75.01, "co2": 417.25, "ch4": 1.91, "temp": 26.93, "riskScore": 0.2657, "risk": "Low" }, { "date": "2023-03-19", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Sun", "season": "Spring", "pm25": 79.26, "pm10": 133.5, "co": 3.2, "nox": 116.32, "no2": 75.74, "so2": 20.83, "vocs": 164.77, "co2": 549.11, "ch4": 2.31, "temp": 31.94, "riskScore": 0.649, "risk": "High" }, { "date": "2023-03-20", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Mon", "season": "Spring", "pm25": 40.15, "pm10": 77.91, "co": 2.05, "nox": 102.41, "no2": 25.0, "so2": 6.26, "vocs": 129.08, "co2": 402.91, "ch4": 1.83, "temp": 29.99, "riskScore": 0.3248, "risk": "Low" }, { "date": "2023-03-21", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Tue", "season": "Spring", "pm25": 69.42, "pm10": 105.93, "co": 2.75, "nox": 220.72, "no2": 84.07, "so2": 15.8, "vocs": 154.94, "co2": 511.68, "ch4": 2.66, "temp": 35.17, "riskScore": 0.5342, "risk": "Medium" }, { "date": "2023-03-22", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Wed", "season": "Spring", "pm25": 53.77, "pm10": 94.85, "co": 3.49, "nox": 176.52, "no2": 55.74, "so2": 15.8, "vocs": 149.75, "co2": 478.78, "ch4": 1.46, "temp": 31.26, "riskScore": 0.4797, "risk": "Medium" }, { "date": "2023-03-23", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Thu", "season": "Spring", "pm25": 67.38, "pm10": 84.77, "co": 1.35, "nox": 41.04, "no2": 15.66, "so2": 8.31, "vocs": 143.28, "co2": 395.47, "ch4": 1.95, "temp": 27.19, "riskScore": 0.4224, "risk": "Medium" }, { "date": "2023-03-24", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Fri", "season": "Spring", "pm25": 45.67, "pm10": 77.54, "co": 2.6, "nox": 134.55, "no2": 46.49, "so2": 4.67, "vocs": 82.93, "co2": 411.83, "ch4": 1.87, "temp": 29.21, "riskScore": 0.3724, "risk": "Medium" }, { "date": "2023-03-25", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Sat", "season": "Spring", "pm25": 82.87, "pm10": 120.93, "co": 2.78, "nox": 109.2, "no2": 81.19, "so2": 23.23, "vocs": 214.9, "co2": 504.38, "ch4": 2.57, "temp": 36.15, "riskScore": 0.6218, "risk": "High" }, { "date": "2023-03-26", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Sun", "season": "Spring", "pm25": 62.22, "pm10": 112.02, "co": 3.53, "nox": 173.11, "no2": 80.15, "so2": 22.59, "vocs": 131.26, "co2": 519.54, "ch4": 2.29, "temp": 32.92, "riskScore": 0.5501, "risk": "Medium" }, { "date": "2023-03-27", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Mon", "season": "Spring", "pm25": 38.67, "pm10": 52.11, "co": 1.15, "nox": 96.72, "no2": 19.65, "so2": 6.46, "vocs": 101.6, "co2": 415.94, "ch4": 1.55, "temp": 29.64, "riskScore": 0.2288, "risk": "Low" }, { "date": "2023-03-28", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Tue", "season": "Spring", "pm25": 43.34, "pm10": 52.58, "co": 1.83, "nox": 81.91, "no2": 47.31, "so2": 5.86, "vocs": 84.87, "co2": 435.49, "ch4": 1.58, "temp": 27.66, "riskScore": 0.2803, "risk": "Low" }, { "date": "2023-03-29", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Wed", "season": "Spring", "pm25": 29.98, "pm10": 95.99, "co": 1.73, "nox": 29.18, "no2": 20.59, "so2": 8.69, "vocs": 111.42, "co2": 394.48, "ch4": 2.13, "temp": 31.99, "riskScore": 0.3007, "risk": "Low" }, { "date": "2023-03-30", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Thu", "season": "Spring", "pm25": 77.58, "pm10": 93.17, "co": 3.31, "nox": 107.22, "no2": 79.09, "so2": 12.57, "vocs": 159.49, "co2": 480.09, "ch4": 2.77, "temp": 29.56, "riskScore": 0.5705, "risk": "Medium" }, { "date": "2023-03-31", "year": 2023, "month": 3, "monthLabel": "Mar 2023", "dow": "Fri", "season": "Spring", "pm25": 32.23, "pm10": 59.62, "co": 2.51, "nox": 95.67, "no2": 33.12, "so2": 9.94, "vocs": 70.08, "co2": 409.06, "ch4": 1.87, "temp": 30.96, "riskScore": 0.2769, "risk": "Low" }, { "date": "2023-04-01", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Sat", "season": "Spring", "pm25": 70.69, "pm10": 128.73, "co": 2.57, "nox": 154.88, "no2": 56.32, "so2": 19.93, "vocs": 138.5, "co2": 477.07, "ch4": 2.52, "temp": 31.44, "riskScore": 0.575, "risk": "Medium" }, { "date": "2023-04-02", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Sun", "season": "Spring", "pm25": 33.21, "pm10": 49.02, "co": 1.75, "nox": 104.89, "no2": 29.37, "so2": 6.98, "vocs": 92.47, "co2": 415.55, "ch4": 1.86, "temp": 28.4, "riskScore": 0.2269, "risk": "Low" }, { "date": "2023-04-03", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Mon", "season": "Spring", "pm25": 107.18, "pm10": 127.16, "co": 3.08, "nox": 161.8, "no2": 80.22, "so2": 17.1, "vocs": 182.67, "co2": 519.0, "ch4": 2.44, "temp": 35.63, "riskScore": 0.751, "risk": "Critical" }, { "date": "2023-04-04", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Tue", "season": "Spring", "pm25": 76.67, "pm10": 95.71, "co": 1.91, "nox": 169.51, "no2": 93.51, "so2": 18.51, "vocs": 214.91, "co2": 521.09, "ch4": 3.0, "temp": 32.59, "riskScore": 0.5082, "risk": "Medium" }, { "date": "2023-04-05", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Wed", "season": "Spring", "pm25": 34.76, "pm10": 92.13, "co": 2.31, "nox": 143.19, "no2": 44.36, "so2": 5.08, "vocs": 82.4, "co2": 409.77, "ch4": 1.75, "temp": 26.66, "riskScore": 0.34, "risk": "Medium" }, { "date": "2023-04-06", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Thu", "season": "Spring", "pm25": 96.97, "pm10": 114.51, "co": 3.67, "nox": 191.53, "no2": 81.36, "so2": 20.14, "vocs": 197.41, "co2": 558.92, "ch4": 2.38, "temp": 33.15, "riskScore": 0.7098, "risk": "Critical" }, { "date": "2023-04-07", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Fri", "season": "Spring", "pm25": 18.67, "pm10": 51.41, "co": 2.69, "nox": 120.01, "no2": 41.79, "so2": 6.07, "vocs": 54.92, "co2": 427.77, "ch4": 1.88, "temp": 28.63, "riskScore": 0.2114, "risk": "Low" }, { "date": "2023-04-08", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Sat", "season": "Spring", "pm25": 28.37, "pm10": 96.0, "co": 1.42, "nox": 3.9, "no2": 16.89, "so2": 7.79, "vocs": 81.6, "co2": 381.52, "ch4": 2.31, "temp": 33.41, "riskScore": 0.28, "risk": "Low" }, { "date": "2023-04-09", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Sun", "season": "Spring", "pm25": 31.38, "pm10": 43.2, "co": 1.98, "nox": 67.63, "no2": 51.61, "so2": 4.06, "vocs": 86.93, "co2": 424.77, "ch4": 1.82, "temp": 27.43, "riskScore": 0.2181, "risk": "Low" }, { "date": "2023-04-10", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Mon", "season": "Spring", "pm25": 33.37, "pm10": 42.82, "co": 2.7, "nox": 114.69, "no2": 41.15, "so2": 3.52, "vocs": 53.91, "co2": 403.94, "ch4": 1.9, "temp": 25.69, "riskScore": 0.2586, "risk": "Low" }, { "date": "2023-04-11", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Tue", "season": "Spring", "pm25": 49.35, "pm10": 93.38, "co": 1.52, "nox": 26.97, "no2": 16.9, "so2": 7.35, "vocs": 86.23, "co2": 383.12, "ch4": 1.97, "temp": 24.9, "riskScore": 0.3692, "risk": "Medium" }, { "date": "2023-04-12", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Wed", "season": "Spring", "pm25": 82.86, "pm10": 102.11, "co": 3.05, "nox": 123.57, "no2": 94.24, "so2": 29.86, "vocs": 143.61, "co2": 508.0, "ch4": 2.54, "temp": 29.65, "riskScore": 0.5981, "risk": "High" }, { "date": "2023-04-13", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Thu", "season": "Spring", "pm25": 58.3, "pm10": 51.28, "co": 1.42, "nox": 36.13, "no2": 9.73, "so2": 6.75, "vocs": 147.85, "co2": 392.17, "ch4": 2.17, "temp": 29.49, "riskScore": 0.3236, "risk": "Low" }, { "date": "2023-04-14", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Fri", "season": "Spring", "pm25": 53.02, "pm10": 60.7, "co": 1.57, "nox": 33.73, "no2": 17.54, "so2": 8.4, "vocs": 93.51, "co2": 397.52, "ch4": 2.17, "temp": 33.45, "riskScore": 0.3255, "risk": "Low" }, { "date": "2023-04-15", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Sat", "season": "Spring", "pm25": 57.06, "pm10": 65.46, "co": 0.83, "nox": 33.41, "no2": 22.18, "so2": 9.13, "vocs": 108.89, "co2": 380.66, "ch4": 2.21, "temp": 29.71, "riskScore": 0.3182, "risk": "Low" }, { "date": "2023-04-16", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Sun", "season": "Spring", "pm25": 99.35, "pm10": 114.77, "co": 2.38, "nox": 153.61, "no2": 54.57, "so2": 13.61, "vocs": 100.69, "co2": 531.05, "ch4": 2.03, "temp": 32.39, "riskScore": 0.6625, "risk": "Critical" }, { "date": "2023-04-17", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Mon", "season": "Spring", "pm25": 47.04, "pm10": 57.4, "co": 1.52, "nox": 40.9, "no2": 22.67, "so2": 3.5, "vocs": 82.93, "co2": 401.26, "ch4": 1.91, "temp": 27.94, "riskScore": 0.2915, "risk": "Low" }, { "date": "2023-04-18", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Tue", "season": "Spring", "pm25": 35.9, "pm10": 42.28, "co": 2.43, "nox": 96.25, "no2": 23.66, "so2": 7.04, "vocs": 36.29, "co2": 429.79, "ch4": 2.06, "temp": 30.17, "riskScore": 0.256, "risk": "Low" }, { "date": "2023-04-19", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Wed", "season": "Spring", "pm25": 91.38, "pm10": 125.62, "co": 1.81, "nox": 153.13, "no2": 69.06, "so2": 16.23, "vocs": 141.58, "co2": 498.03, "ch4": 2.2, "temp": 30.79, "riskScore": 0.6234, "risk": "High" }, { "date": "2023-04-20", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Thu", "season": "Spring", "pm25": 26.71, "pm10": 62.45, "co": 2.16, "nox": 82.08, "no2": 55.59, "so2": 2.88, "vocs": 81.26, "co2": 423.95, "ch4": 1.68, "temp": 28.21, "riskScore": 0.243, "risk": "Low" }, { "date": "2023-04-21", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Fri", "season": "Spring", "pm25": 77.84, "pm10": 135.92, "co": 3.93, "nox": 164.31, "no2": 35.85, "so2": 21.24, "vocs": 217.51, "co2": 508.44, "ch4": 2.18, "temp": 33.96, "riskScore": 0.6803, "risk": "Critical" }, { "date": "2023-04-22", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Sat", "season": "Spring", "pm25": 32.25, "pm10": 71.27, "co": 2.91, "nox": 118.68, "no2": 32.99, "so2": 6.61, "vocs": 68.79, "co2": 411.72, "ch4": 1.85, "temp": 28.44, "riskScore": 0.317, "risk": "Low" }, { "date": "2023-04-23", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Sun", "season": "Spring", "pm25": 73.29, "pm10": 108.28, "co": 2.26, "nox": 147.59, "no2": 86.4, "so2": 13.44, "vocs": 154.33, "co2": 485.2, "ch4": 2.67, "temp": 30.62, "riskScore": 0.5331, "risk": "Medium" }, { "date": "2023-04-24", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Mon", "season": "Spring", "pm25": 78.68, "pm10": 171.59, "co": 3.4, "nox": 125.89, "no2": 94.59, "so2": 28.39, "vocs": 133.39, "co2": 532.57, "ch4": 2.39, "temp": 32.59, "riskScore": 0.7274, "risk": "Critical" }, { "date": "2023-04-25", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Tue", "season": "Spring", "pm25": 18.68, "pm10": 83.71, "co": 2.25, "nox": 64.07, "no2": 27.78, "so2": 2.96, "vocs": 121.6, "co2": 429.65, "ch4": 1.84, "temp": 28.8, "riskScore": 0.2526, "risk": "Low" }, { "date": "2023-04-26", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Wed", "season": "Spring", "pm25": 39.63, "pm10": 91.77, "co": 1.87, "nox": 70.68, "no2": 27.67, "so2": 6.39, "vocs": 118.93, "co2": 437.27, "ch4": 1.82, "temp": 28.64, "riskScore": 0.3404, "risk": "Medium" }, { "date": "2023-04-27", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Thu", "season": "Spring", "pm25": 60.73, "pm10": 82.5, "co": 1.49, "nox": 26.73, "no2": 9.05, "so2": 10.5, "vocs": 92.5, "co2": 393.84, "ch4": 1.82, "temp": 27.15, "riskScore": 0.3961, "risk": "Medium" }, { "date": "2023-04-28", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Fri", "season": "Spring", "pm25": 47.13, "pm10": 62.13, "co": 2.07, "nox": 157.98, "no2": 43.93, "so2": 5.38, "vocs": 73.82, "co2": 418.48, "ch4": 1.94, "temp": 31.91, "riskScore": 0.3254, "risk": "Low" }, { "date": "2023-04-29", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Sat", "season": "Spring", "pm25": 35.57, "pm10": 46.04, "co": 1.66, "nox": 11.64, "no2": 17.54, "so2": 5.79, "vocs": 46.18, "co2": 414.93, "ch4": 2.0, "temp": 30.52, "riskScore": 0.2269, "risk": "Low" }, { "date": "2023-04-30", "year": 2023, "month": 4, "monthLabel": "Apr 2023", "dow": "Sun", "season": "Spring", "pm25": 80.39, "pm10": 70.63, "co": 4.24, "nox": 176.59, "no2": 35.59, "so2": 27.38, "vocs": 182.51, "co2": 505.21, "ch4": 2.39, "temp": 32.1, "riskScore": 0.5819, "risk": "High" }, { "date": "2023-05-01", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Mon", "season": "Spring", "pm25": 88.05, "pm10": 102.03, "co": 2.98, "nox": 150.85, "no2": 69.86, "so2": 25.43, "vocs": 164.24, "co2": 516.36, "ch4": 2.92, "temp": 34.12, "riskScore": 0.6172, "risk": "High" }, { "date": "2023-05-02", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Tue", "season": "Spring", "pm25": 35.41, "pm10": 76.33, "co": 1.34, "nox": 39.51, "no2": 0.0, "so2": 7.78, "vocs": 98.28, "co2": 393.02, "ch4": 2.13, "temp": 28.43, "riskScore": 0.269, "risk": "Low" }, { "date": "2023-05-03", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Wed", "season": "Spring", "pm25": 45.59, "pm10": 65.85, "co": 1.47, "nox": 16.88, "no2": 7.19, "so2": 5.34, "vocs": 106.96, "co2": 375.2, "ch4": 2.13, "temp": 32.12, "riskScore": 0.2988, "risk": "Low" }, { "date": "2023-05-04", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Thu", "season": "Spring", "pm25": 36.49, "pm10": 85.38, "co": 1.21, "nox": 35.49, "no2": 10.39, "so2": 11.04, "vocs": 133.71, "co2": 382.57, "ch4": 1.88, "temp": 26.48, "riskScore": 0.285, "risk": "Low" }, { "date": "2023-05-05", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Fri", "season": "Spring", "pm25": 43.77, "pm10": 70.1, "co": 1.34, "nox": 142.86, "no2": 29.41, "so2": 5.76, "vocs": 36.52, "co2": 419.25, "ch4": 1.88, "temp": 29.8, "riskScore": 0.2933, "risk": "Low" }, { "date": "2023-05-06", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Sat", "season": "Spring", "pm25": 40.3, "pm10": 69.73, "co": 1.1, "nox": 38.63, "no2": 11.02, "so2": 8.22, "vocs": 72.03, "co2": 389.69, "ch4": 1.61, "temp": 34.18, "riskScore": 0.267, "risk": "Low" }, { "date": "2023-05-07", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Sun", "season": "Spring", "pm25": 40.32, "pm10": 79.97, "co": 1.7, "nox": 40.92, "no2": 17.67, "so2": 10.02, "vocs": 108.03, "co2": 388.83, "ch4": 2.09, "temp": 28.5, "riskScore": 0.3133, "risk": "Low" }, { "date": "2023-05-08", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Mon", "season": "Spring", "pm25": 53.14, "pm10": 61.22, "co": 2.02, "nox": 51.57, "no2": 11.97, "so2": 9.48, "vocs": 107.48, "co2": 405.62, "ch4": 2.01, "temp": 25.74, "riskScore": 0.3472, "risk": "Medium" }, { "date": "2023-05-09", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Tue", "season": "Spring", "pm25": 32.71, "pm10": 61.35, "co": 1.51, "nox": 105.92, "no2": 35.45, "so2": 3.4, "vocs": 105.98, "co2": 406.72, "ch4": 1.94, "temp": 32.32, "riskScore": 0.237, "risk": "Low" }, { "date": "2023-05-10", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Wed", "season": "Spring", "pm25": 47.55, "pm10": 62.83, "co": 2.09, "nox": 96.85, "no2": 32.83, "so2": 5.06, "vocs": 63.04, "co2": 422.46, "ch4": 1.63, "temp": 28.24, "riskScore": 0.3294, "risk": "Low" }, { "date": "2023-05-11", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Thu", "season": "Spring", "pm25": 71.25, "pm10": 120.77, "co": 2.4, "nox": 193.67, "no2": 96.99, "so2": 23.73, "vocs": 167.8, "co2": 507.18, "ch4": 2.67, "temp": 32.58, "riskScore": 0.5546, "risk": "Medium" }, { "date": "2023-05-12", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Fri", "season": "Spring", "pm25": 92.9, "pm10": 77.41, "co": 2.97, "nox": 116.57, "no2": 64.47, "so2": 21.58, "vocs": 145.01, "co2": 540.86, "ch4": 2.14, "temp": 35.27, "riskScore": 0.5908, "risk": "High" }, { "date": "2023-05-13", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Sat", "season": "Spring", "pm25": 33.33, "pm10": 64.24, "co": 2.33, "nox": 93.78, "no2": 56.07, "so2": 5.98, "vocs": 94.7, "co2": 431.73, "ch4": 1.84, "temp": 27.41, "riskScore": 0.2822, "risk": "Low" }, { "date": "2023-05-14", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Sun", "season": "Spring", "pm25": 52.3, "pm10": 64.5, "co": 1.51, "nox": 108.06, "no2": 33.18, "so2": 2.61, "vocs": 79.21, "co2": 402.27, "ch4": 1.96, "temp": 31.7, "riskScore": 0.327, "risk": "Low" }, { "date": "2023-05-15", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Mon", "season": "Spring", "pm25": 66.74, "pm10": 81.22, "co": 1.4, "nox": 33.29, "no2": 19.5, "so2": 6.76, "vocs": 111.95, "co2": 389.8, "ch4": 2.17, "temp": 25.22, "riskScore": 0.4152, "risk": "Medium" }, { "date": "2023-05-16", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Tue", "season": "Spring", "pm25": 83.68, "pm10": 116.05, "co": 4.08, "nox": 111.19, "no2": 86.17, "so2": 23.8, "vocs": 167.52, "co2": 518.9, "ch4": 2.71, "temp": 28.57, "riskScore": 0.6746, "risk": "Critical" }, { "date": "2023-05-17", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Wed", "season": "Spring", "pm25": 27.15, "pm10": 69.72, "co": 2.36, "nox": 96.98, "no2": 44.2, "so2": 3.23, "vocs": 71.25, "co2": 416.27, "ch4": 2.15, "temp": 29.2, "riskScore": 0.2675, "risk": "Low" }, { "date": "2023-05-18", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Thu", "season": "Spring", "pm25": 38.94, "pm10": 46.87, "co": 2.9, "nox": 89.6, "no2": 28.19, "so2": 6.96, "vocs": 74.88, "co2": 420.81, "ch4": 1.76, "temp": 29.37, "riskScore": 0.2989, "risk": "Low" }, { "date": "2023-05-19", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Fri", "season": "Spring", "pm25": 60.12, "pm10": 54.92, "co": 2.23, "nox": 92.34, "no2": 40.66, "so2": 7.18, "vocs": 51.58, "co2": 411.83, "ch4": 1.91, "temp": 29.01, "riskScore": 0.3746, "risk": "Medium" }, { "date": "2023-05-20", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Sat", "season": "Spring", "pm25": 30.68, "pm10": 46.71, "co": 2.09, "nox": 78.92, "no2": 38.65, "so2": 5.96, "vocs": 52.69, "co2": 425.77, "ch4": 2.17, "temp": 27.85, "riskScore": 0.2271, "risk": "Low" }, { "date": "2023-05-21", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Sun", "season": "Spring", "pm25": 48.65, "pm10": 45.22, "co": 1.27, "nox": 37.18, "no2": 23.38, "so2": 11.36, "vocs": 118.37, "co2": 376.99, "ch4": 1.72, "temp": 19.58, "riskScore": 0.2638, "risk": "Low" }, { "date": "2023-05-22", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Mon", "season": "Spring", "pm25": 31.66, "pm10": 69.07, "co": 1.86, "nox": 32.06, "no2": 13.11, "so2": 2.26, "vocs": 95.98, "co2": 397.78, "ch4": 2.07, "temp": 24.71, "riskScore": 0.263, "risk": "Low" }, { "date": "2023-05-23", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Tue", "season": "Spring", "pm25": 79.19, "pm10": 136.26, "co": 2.66, "nox": 121.38, "no2": 55.7, "so2": 14.65, "vocs": 91.9, "co2": 514.28, "ch4": 2.55, "temp": 32.66, "riskScore": 0.6297, "risk": "High" }, { "date": "2023-05-24", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Wed", "season": "Spring", "pm25": 10.76, "pm10": 73.26, "co": 1.22, "nox": 118.42, "no2": 37.19, "so2": 5.13, "vocs": 90.32, "co2": 414.71, "ch4": 1.96, "temp": 27.49, "riskScore": 0.1525, "risk": "Low" }, { "date": "2023-05-25", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Thu", "season": "Spring", "pm25": 87.0, "pm10": 119.29, "co": 3.14, "nox": 101.55, "no2": 87.47, "so2": 16.33, "vocs": 125.69, "co2": 522.97, "ch4": 2.2, "temp": 33.12, "riskScore": 0.6525, "risk": "High" }, { "date": "2023-05-26", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Fri", "season": "Spring", "pm25": 82.65, "pm10": 112.66, "co": 3.31, "nox": 125.17, "no2": 71.29, "so2": 14.64, "vocs": 62.36, "co2": 518.08, "ch4": 1.79, "temp": 30.98, "riskScore": 0.6288, "risk": "High" }, { "date": "2023-05-27", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Sat", "season": "Spring", "pm25": 94.17, "pm10": 106.22, "co": 3.09, "nox": 140.93, "no2": 57.78, "so2": 9.33, "vocs": 148.9, "co2": 521.32, "ch4": 2.74, "temp": 34.62, "riskScore": 0.6561, "risk": "High" }, { "date": "2023-05-28", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Sun", "season": "Spring", "pm25": 40.67, "pm10": 79.21, "co": 1.53, "nox": 33.17, "no2": 14.84, "so2": 7.88, "vocs": 81.6, "co2": 398.81, "ch4": 1.81, "temp": 27.98, "riskScore": 0.3059, "risk": "Low" }, { "date": "2023-05-29", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Mon", "season": "Spring", "pm25": 26.87, "pm10": 56.92, "co": 1.53, "nox": 66.06, "no2": 37.37, "so2": 7.54, "vocs": 65.85, "co2": 408.76, "ch4": 1.57, "temp": 31.07, "riskScore": 0.2045, "risk": "Low" }, { "date": "2023-05-30", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Tue", "season": "Spring", "pm25": 87.27, "pm10": 103.07, "co": 2.33, "nox": 130.69, "no2": 85.45, "so2": 18.33, "vocs": 137.89, "co2": 508.47, "ch4": 3.12, "temp": 30.86, "riskScore": 0.5865, "risk": "High" }, { "date": "2023-05-31", "year": 2023, "month": 5, "monthLabel": "May 2023", "dow": "Wed", "season": "Spring", "pm25": 49.08, "pm10": 60.24, "co": 1.16, "nox": 19.42, "no2": 14.79, "so2": 6.15, "vocs": 129.34, "co2": 393.64, "ch4": 1.88, "temp": 28.83, "riskScore": 0.289, "risk": "Low" }, { "date": "2023-06-01", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Thu", "season": "Summer", "pm25": 82.92, "pm10": 112.94, "co": 2.3, "nox": 160.15, "no2": 65.57, "so2": 20.84, "vocs": 189.53, "co2": 522.8, "ch4": 2.9, "temp": 32.76, "riskScore": 0.5849, "risk": "High" }, { "date": "2023-06-02", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Fri", "season": "Summer", "pm25": 91.05, "pm10": 108.66, "co": 3.17, "nox": 152.09, "no2": 85.63, "so2": 17.71, "vocs": 140.94, "co2": 490.82, "ch4": 2.76, "temp": 32.66, "riskScore": 0.6511, "risk": "High" }, { "date": "2023-06-03", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Sat", "season": "Summer", "pm25": 42.64, "pm10": 78.86, "co": 2.02, "nox": 62.04, "no2": 52.44, "so2": 4.79, "vocs": 104.5, "co2": 421.36, "ch4": 1.87, "temp": 28.42, "riskScore": 0.3356, "risk": "Medium" }, { "date": "2023-06-04", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Sun", "season": "Summer", "pm25": 73.97, "pm10": 130.49, "co": 1.64, "nox": 134.72, "no2": 81.66, "so2": 26.88, "vocs": 180.38, "co2": 502.52, "ch4": 2.81, "temp": 30.37, "riskScore": 0.5504, "risk": "Medium" }, { "date": "2023-06-05", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Mon", "season": "Summer", "pm25": 84.23, "pm10": 134.93, "co": 2.33, "nox": 138.62, "no2": 52.92, "so2": 13.43, "vocs": 132.62, "co2": 493.93, "ch4": 2.89, "temp": 32.25, "riskScore": 0.6338, "risk": "High" }, { "date": "2023-06-06", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Tue", "season": "Summer", "pm25": 30.94, "pm10": 58.99, "co": 2.28, "nox": 113.52, "no2": 48.85, "so2": 7.01, "vocs": 121.14, "co2": 442.34, "ch4": 1.64, "temp": 34.18, "riskScore": 0.26, "risk": "Low" }, { "date": "2023-06-07", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Wed", "season": "Summer", "pm25": 33.8, "pm10": 56.72, "co": 2.33, "nox": 102.15, "no2": 34.2, "so2": 6.66, "vocs": 68.94, "co2": 435.28, "ch4": 1.73, "temp": 31.59, "riskScore": 0.2699, "risk": "Low" }, { "date": "2023-06-08", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Thu", "season": "Summer", "pm25": 53.81, "pm10": 58.31, "co": 1.64, "nox": 30.83, "no2": 12.66, "so2": 6.53, "vocs": 100.9, "co2": 401.64, "ch4": 2.05, "temp": 29.93, "riskScore": 0.3274, "risk": "Low" }, { "date": "2023-06-09", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Fri", "season": "Summer", "pm25": 38.79, "pm10": 74.34, "co": 1.36, "nox": 29.24, "no2": 19.38, "so2": 7.22, "vocs": 77.88, "co2": 386.45, "ch4": 1.98, "temp": 29.9, "riskScore": 0.2809, "risk": "Low" }, { "date": "2023-06-10", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Sat", "season": "Summer", "pm25": 35.75, "pm10": 35.97, "co": 2.06, "nox": 93.85, "no2": 31.57, "so2": 9.34, "vocs": 76.48, "co2": 425.51, "ch4": 1.81, "temp": 33.39, "riskScore": 0.227, "risk": "Low" }, { "date": "2023-06-11", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Sun", "season": "Summer", "pm25": 81.59, "pm10": 110.61, "co": 4.61, "nox": 144.14, "no2": 74.57, "so2": 7.49, "vocs": 104.0, "co2": 489.87, "ch4": 1.74, "temp": 30.1, "riskScore": 0.6791, "risk": "Critical" }, { "date": "2023-06-12", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Mon", "season": "Summer", "pm25": 76.93, "pm10": 120.14, "co": 3.26, "nox": 182.53, "no2": 61.34, "so2": 22.4, "vocs": 231.93, "co2": 496.39, "ch4": 2.27, "temp": 32.61, "riskScore": 0.6166, "risk": "High" }, { "date": "2023-06-13", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Tue", "season": "Summer", "pm25": 45.38, "pm10": 61.3, "co": 2.38, "nox": 89.1, "no2": 40.69, "so2": 4.41, "vocs": 82.26, "co2": 419.13, "ch4": 1.73, "temp": 27.75, "riskScore": 0.3304, "risk": "Low" }, { "date": "2023-06-14", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Wed", "season": "Summer", "pm25": 48.21, "pm10": 79.16, "co": 2.14, "nox": 14.19, "no2": 19.48, "so2": 7.03, "vocs": 103.67, "co2": 398.97, "ch4": 1.95, "temp": 25.33, "riskScore": 0.3657, "risk": "Medium" }, { "date": "2023-06-15", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Thu", "season": "Summer", "pm25": 47.32, "pm10": 55.26, "co": 1.29, "nox": 39.2, "no2": 15.57, "so2": 4.65, "vocs": 77.6, "co2": 405.06, "ch4": 2.27, "temp": 31.98, "riskScore": 0.2781, "risk": "Low" }, { "date": "2023-06-16", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Fri", "season": "Summer", "pm25": 62.89, "pm10": 120.14, "co": 3.39, "nox": 163.55, "no2": 53.88, "so2": 21.05, "vocs": 200.6, "co2": 518.35, "ch4": 1.76, "temp": 36.12, "riskScore": 0.5622, "risk": "Medium" }, { "date": "2023-06-17", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Sat", "season": "Summer", "pm25": 36.6, "pm10": 44.58, "co": 1.68, "nox": 131.64, "no2": 31.34, "so2": 6.94, "vocs": 88.54, "co2": 437.75, "ch4": 1.56, "temp": 31.84, "riskScore": 0.2295, "risk": "Low" }, { "date": "2023-06-18", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Sun", "season": "Summer", "pm25": 20.9, "pm10": 66.97, "co": 1.96, "nox": 76.78, "no2": 18.44, "so2": 7.99, "vocs": 89.14, "co2": 416.54, "ch4": 2.08, "temp": 36.17, "riskScore": 0.2175, "risk": "Low" }, { "date": "2023-06-19", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Mon", "season": "Summer", "pm25": 33.43, "pm10": 62.26, "co": 1.44, "nox": 30.5, "no2": 14.19, "so2": 5.17, "vocs": 130.33, "co2": 382.86, "ch4": 2.22, "temp": 24.45, "riskScore": 0.2387, "risk": "Low" }, { "date": "2023-06-20", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Tue", "season": "Summer", "pm25": 108.37, "pm10": 110.76, "co": 2.93, "nox": 148.62, "no2": 52.8, "so2": 20.03, "vocs": 135.73, "co2": 508.19, "ch4": 2.17, "temp": 32.28, "riskScore": 0.7182, "risk": "Critical" }, { "date": "2023-06-21", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Wed", "season": "Summer", "pm25": 79.39, "pm10": 96.43, "co": 1.16, "nox": 151.38, "no2": 69.24, "so2": 12.98, "vocs": 106.41, "co2": 475.59, "ch4": 2.5, "temp": 33.31, "riskScore": 0.4875, "risk": "Medium" }, { "date": "2023-06-22", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Thu", "season": "Summer", "pm25": 33.93, "pm10": 66.72, "co": 2.87, "nox": 60.73, "no2": 28.73, "so2": 2.61, "vocs": 82.86, "co2": 442.31, "ch4": 1.93, "temp": 31.0, "riskScore": 0.3136, "risk": "Low" }, { "date": "2023-06-23", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Fri", "season": "Summer", "pm25": 51.51, "pm10": 85.28, "co": 1.57, "nox": 30.3, "no2": 8.39, "so2": 5.77, "vocs": 118.66, "co2": 402.6, "ch4": 2.06, "temp": 24.45, "riskScore": 0.3654, "risk": "Medium" }, { "date": "2023-06-24", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Sat", "season": "Summer", "pm25": 38.74, "pm10": 80.17, "co": 1.42, "nox": 37.1, "no2": 19.28, "so2": 5.9, "vocs": 69.97, "co2": 404.4, "ch4": 1.86, "temp": 29.36, "riskScore": 0.2945, "risk": "Low" }, { "date": "2023-06-25", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Sun", "season": "Summer", "pm25": 57.13, "pm10": 124.82, "co": 2.53, "nox": 157.98, "no2": 96.54, "so2": 18.19, "vocs": 158.4, "co2": 517.46, "ch4": 2.46, "temp": 30.65, "riskScore": 0.5078, "risk": "Medium" }, { "date": "2023-06-26", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Mon", "season": "Summer", "pm25": 44.38, "pm10": 99.55, "co": 2.33, "nox": 29.16, "no2": 5.38, "so2": 13.35, "vocs": 123.92, "co2": 378.43, "ch4": 1.96, "temp": 30.02, "riskScore": 0.3963, "risk": "Medium" }, { "date": "2023-06-27", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Tue", "season": "Summer", "pm25": 46.94, "pm10": 54.95, "co": 1.93, "nox": 110.37, "no2": 54.92, "so2": 7.33, "vocs": 75.91, "co2": 430.04, "ch4": 2.27, "temp": 30.38, "riskScore": 0.3049, "risk": "Low" }, { "date": "2023-06-28", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Wed", "season": "Summer", "pm25": 71.88, "pm10": 78.28, "co": 2.08, "nox": 40.85, "no2": 17.45, "so2": 10.43, "vocs": 78.3, "co2": 391.41, "ch4": 2.24, "temp": 23.68, "riskScore": 0.4623, "risk": "Medium" }, { "date": "2023-06-29", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Thu", "season": "Summer", "pm25": 92.01, "pm10": 135.09, "co": 2.98, "nox": 185.67, "no2": 80.62, "so2": 21.76, "vocs": 182.1, "co2": 482.36, "ch4": 2.45, "temp": 31.51, "riskScore": 0.6966, "risk": "Critical" }, { "date": "2023-06-30", "year": 2023, "month": 6, "monthLabel": "Jun 2023", "dow": "Fri", "season": "Summer", "pm25": 87.05, "pm10": 82.88, "co": 2.67, "nox": 182.9, "no2": 98.21, "so2": 16.42, "vocs": 160.08, "co2": 512.57, "ch4": 2.15, "temp": 32.86, "riskScore": 0.5626, "risk": "Medium" }, { "date": "2023-07-01", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Sat", "season": "Summer", "pm25": 25.02, "pm10": 48.55, "co": 1.86, "nox": 121.82, "no2": 33.7, "so2": 4.69, "vocs": 94.01, "co2": 426.33, "ch4": 1.49, "temp": 29.73, "riskScore": 0.1958, "risk": "Low" }, { "date": "2023-07-02", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Sun", "season": "Summer", "pm25": 25.16, "pm10": 91.66, "co": 2.37, "nox": 21.45, "no2": 16.68, "so2": 8.02, "vocs": 125.09, "co2": 377.1, "ch4": 1.87, "temp": 28.57, "riskScore": 0.3011, "risk": "Low" }, { "date": "2023-07-03", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Mon", "season": "Summer", "pm25": 26.22, "pm10": 66.09, "co": 1.59, "nox": 19.15, "no2": 9.92, "so2": 5.99, "vocs": 104.19, "co2": 394.27, "ch4": 1.78, "temp": 27.03, "riskScore": 0.2219, "risk": "Low" }, { "date": "2023-07-04", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Tue", "season": "Summer", "pm25": 72.14, "pm10": 123.05, "co": 2.77, "nox": 125.33, "no2": 86.82, "so2": 20.0, "vocs": 149.72, "co2": 503.1, "ch4": 2.75, "temp": 31.27, "riskScore": 0.5793, "risk": "Medium" }, { "date": "2023-07-05", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Wed", "season": "Summer", "pm25": 42.97, "pm10": 72.69, "co": 1.46, "nox": 40.7, "no2": 15.95, "so2": 9.72, "vocs": 103.78, "co2": 396.41, "ch4": 2.12, "temp": 27.49, "riskScore": 0.2999, "risk": "Low" }, { "date": "2023-07-06", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Thu", "season": "Summer", "pm25": 81.18, "pm10": 108.9, "co": 2.59, "nox": 124.73, "no2": 76.16, "so2": 22.75, "vocs": 139.2, "co2": 483.39, "ch4": 2.61, "temp": 31.39, "riskScore": 0.5833, "risk": "High" }, { "date": "2023-07-07", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Fri", "season": "Summer", "pm25": 47.44, "pm10": 64.88, "co": 0.37, "nox": 25.62, "no2": 15.7, "so2": 8.82, "vocs": 96.88, "co2": 390.17, "ch4": 1.71, "temp": 27.37, "riskScore": 0.2552, "risk": "Low" }, { "date": "2023-07-08", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Sat", "season": "Summer", "pm25": 47.64, "pm10": 46.13, "co": 1.84, "nox": 46.22, "no2": 11.89, "so2": 9.87, "vocs": 91.87, "co2": 403.07, "ch4": 2.13, "temp": 30.27, "riskScore": 0.2868, "risk": "Low" }, { "date": "2023-07-09", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Sun", "season": "Summer", "pm25": 46.66, "pm10": 63.88, "co": 1.59, "nox": 54.67, "no2": 10.04, "so2": 10.0, "vocs": 112.93, "co2": 404.8, "ch4": 2.06, "temp": 26.1, "riskScore": 0.3052, "risk": "Low" }, { "date": "2023-07-10", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Mon", "season": "Summer", "pm25": 42.26, "pm10": 52.1, "co": 1.49, "nox": 4.38, "no2": 14.04, "so2": 12.83, "vocs": 119.62, "co2": 387.37, "ch4": 2.0, "temp": 29.64, "riskScore": 0.2596, "risk": "Low" }, { "date": "2023-07-11", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Tue", "season": "Summer", "pm25": 24.65, "pm10": 64.09, "co": 1.42, "nox": 25.58, "no2": 13.32, "so2": 8.46, "vocs": 127.45, "co2": 383.08, "ch4": 1.77, "temp": 26.6, "riskScore": 0.2038, "risk": "Low" }, { "date": "2023-07-12", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Wed", "season": "Summer", "pm25": 94.71, "pm10": 105.16, "co": 3.47, "nox": 85.15, "no2": 73.83, "so2": 24.94, "vocs": 109.46, "co2": 513.54, "ch4": 1.82, "temp": 31.13, "riskScore": 0.6736, "risk": "Critical" }, { "date": "2023-07-13", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Thu", "season": "Summer", "pm25": 38.12, "pm10": 62.25, "co": 2.08, "nox": 84.5, "no2": 64.07, "so2": 5.35, "vocs": 71.15, "co2": 420.25, "ch4": 1.84, "temp": 26.81, "riskScore": 0.2874, "risk": "Low" }, { "date": "2023-07-14", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Fri", "season": "Summer", "pm25": 61.1, "pm10": 107.67, "co": 2.22, "nox": 138.74, "no2": 65.23, "so2": 26.41, "vocs": 166.73, "co2": 504.93, "ch4": 2.65, "temp": 35.28, "riskScore": 0.4782, "risk": "Medium" }, { "date": "2023-07-15", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Sat", "season": "Summer", "pm25": 52.66, "pm10": 65.74, "co": 1.06, "nox": 27.37, "no2": 5.82, "so2": 8.66, "vocs": 115.5, "co2": 388.44, "ch4": 2.01, "temp": 29.75, "riskScore": 0.3106, "risk": "Low" }, { "date": "2023-07-16", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Sun", "season": "Summer", "pm25": 52.86, "pm10": 73.32, "co": 1.93, "nox": 32.82, "no2": 22.84, "so2": 7.66, "vocs": 67.15, "co2": 391.82, "ch4": 2.19, "temp": 27.87, "riskScore": 0.3651, "risk": "Medium" }, { "date": "2023-07-17", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Mon", "season": "Summer", "pm25": 73.56, "pm10": 131.77, "co": 3.13, "nox": 102.06, "no2": 76.93, "so2": 30.12, "vocs": 109.1, "co2": 486.76, "ch4": 2.63, "temp": 33.04, "riskScore": 0.6182, "risk": "High" }, { "date": "2023-07-18", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Tue", "season": "Summer", "pm25": 49.89, "pm10": 79.52, "co": 1.62, "nox": 19.43, "no2": 11.25, "so2": 10.97, "vocs": 94.49, "co2": 400.55, "ch4": 2.09, "temp": 29.64, "riskScore": 0.35, "risk": "Medium" }, { "date": "2023-07-19", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Wed", "season": "Summer", "pm25": 89.43, "pm10": 94.61, "co": 2.89, "nox": 129.13, "no2": 53.74, "so2": 22.35, "vocs": 171.42, "co2": 482.54, "ch4": 2.49, "temp": 32.03, "riskScore": 0.605, "risk": "High" }, { "date": "2023-07-20", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Thu", "season": "Summer", "pm25": 69.96, "pm10": 38.05, "co": 2.39, "nox": 156.42, "no2": 36.93, "so2": 4.83, "vocs": 66.55, "co2": 405.6, "ch4": 1.43, "temp": 33.22, "riskScore": 0.3921, "risk": "Medium" }, { "date": "2023-07-21", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Fri", "season": "Summer", "pm25": 35.14, "pm10": 45.69, "co": 2.99, "nox": 89.82, "no2": 46.86, "so2": 5.21, "vocs": 91.69, "co2": 404.36, "ch4": 2.12, "temp": 30.21, "riskScore": 0.2846, "risk": "Low" }, { "date": "2023-07-22", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Sat", "season": "Summer", "pm25": 93.19, "pm10": 116.96, "co": 3.08, "nox": 140.52, "no2": 86.55, "so2": 23.31, "vocs": 166.17, "co2": 519.66, "ch4": 2.3, "temp": 31.41, "riskScore": 0.6718, "risk": "Critical" }, { "date": "2023-07-23", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Sun", "season": "Summer", "pm25": 40.61, "pm10": 77.99, "co": 1.31, "nox": 30.11, "no2": 18.55, "so2": 10.53, "vocs": 90.78, "co2": 399.58, "ch4": 2.21, "temp": 30.22, "riskScore": 0.2932, "risk": "Low" }, { "date": "2023-07-24", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Mon", "season": "Summer", "pm25": 36.13, "pm10": 144.96, "co": 2.55, "nox": 144.98, "no2": 79.99, "so2": 28.35, "vocs": 223.03, "co2": 502.68, "ch4": 2.91, "temp": 31.31, "riskScore": 0.4565, "risk": "Medium" }, { "date": "2023-07-25", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Tue", "season": "Summer", "pm25": 24.13, "pm10": 43.71, "co": 1.14, "nox": 116.98, "no2": 28.51, "so2": 6.33, "vocs": 89.25, "co2": 413.22, "ch4": 2.04, "temp": 28.04, "riskScore": 0.1502, "risk": "Low" }, { "date": "2023-07-26", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Wed", "season": "Summer", "pm25": 40.7, "pm10": 55.17, "co": 0.98, "nox": 37.05, "no2": 11.24, "so2": 5.66, "vocs": 103.55, "co2": 372.01, "ch4": 2.03, "temp": 22.75, "riskScore": 0.2358, "risk": "Low" }, { "date": "2023-07-27", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Thu", "season": "Summer", "pm25": 46.39, "pm10": 114.12, "co": 3.5, "nox": 154.34, "no2": 77.37, "so2": 20.86, "vocs": 118.22, "co2": 519.2, "ch4": 2.14, "temp": 32.64, "riskScore": 0.4851, "risk": "Medium" }, { "date": "2023-07-28", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Fri", "season": "Summer", "pm25": 47.76, "pm10": 78.96, "co": 1.28, "nox": 36.66, "no2": 17.11, "so2": 9.68, "vocs": 84.57, "co2": 379.0, "ch4": 2.09, "temp": 30.34, "riskScore": 0.3242, "risk": "Low" }, { "date": "2023-07-29", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Sat", "season": "Summer", "pm25": 104.51, "pm10": 77.13, "co": 2.72, "nox": 144.51, "no2": 40.52, "so2": 7.82, "vocs": 154.32, "co2": 506.0, "ch4": 2.65, "temp": 35.5, "riskScore": 0.6287, "risk": "High" }, { "date": "2023-07-30", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Sun", "season": "Summer", "pm25": 42.74, "pm10": 44.98, "co": 1.88, "nox": 104.83, "no2": 53.2, "so2": 8.64, "vocs": 80.8, "co2": 422.69, "ch4": 1.85, "temp": 32.77, "riskScore": 0.2658, "risk": "Low" }, { "date": "2023-07-31", "year": 2023, "month": 7, "monthLabel": "Jul 2023", "dow": "Mon", "season": "Summer", "pm25": 63.24, "pm10": 99.76, "co": 3.78, "nox": 161.3, "no2": 82.15, "so2": 16.75, "vocs": 173.16, "co2": 538.69, "ch4": 2.52, "temp": 31.72, "riskScore": 0.5427, "risk": "Medium" }, { "date": "2023-08-01", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Tue", "season": "Summer", "pm25": 74.5, "pm10": 94.4, "co": 2.49, "nox": 146.63, "no2": 80.54, "so2": 21.32, "vocs": 178.44, "co2": 474.44, "ch4": 2.43, "temp": 31.77, "riskScore": 0.5226, "risk": "Medium" }, { "date": "2023-08-02", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Wed", "season": "Summer", "pm25": 46.98, "pm10": 69.27, "co": 1.69, "nox": 37.01, "no2": 19.28, "so2": 8.53, "vocs": 90.99, "co2": 403.36, "ch4": 1.99, "temp": 27.2, "riskScore": 0.3212, "risk": "Low" }, { "date": "2023-08-03", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Thu", "season": "Summer", "pm25": 50.14, "pm10": 50.8, "co": 1.59, "nox": 83.93, "no2": 57.02, "so2": 2.78, "vocs": 46.78, "co2": 413.37, "ch4": 1.45, "temp": 29.74, "riskScore": 0.2951, "risk": "Low" }, { "date": "2023-08-04", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Fri", "season": "Summer", "pm25": 67.74, "pm10": 128.71, "co": 2.38, "nox": 114.42, "no2": 75.17, "so2": 28.83, "vocs": 131.16, "co2": 498.18, "ch4": 3.11, "temp": 34.54, "riskScore": 0.5536, "risk": "Medium" }, { "date": "2023-08-05", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Sat", "season": "Summer", "pm25": 92.17, "pm10": 97.03, "co": 3.71, "nox": 174.56, "no2": 93.07, "so2": 14.39, "vocs": 122.47, "co2": 505.43, "ch4": 2.67, "temp": 33.68, "riskScore": 0.6583, "risk": "Critical" }, { "date": "2023-08-06", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Sun", "season": "Summer", "pm25": 58.33, "pm10": 148.61, "co": 3.49, "nox": 154.26, "no2": 62.49, "so2": 23.11, "vocs": 145.11, "co2": 501.34, "ch4": 2.72, "temp": 31.21, "riskScore": 0.6011, "risk": "High" }, { "date": "2023-08-07", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Mon", "season": "Summer", "pm25": 52.76, "pm10": 49.88, "co": 1.6, "nox": 47.0, "no2": 14.93, "so2": 9.46, "vocs": 91.93, "co2": 392.97, "ch4": 1.44, "temp": 29.75, "riskScore": 0.3054, "risk": "Low" }, { "date": "2023-08-08", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Tue", "season": "Summer", "pm25": 50.68, "pm10": 79.36, "co": 1.65, "nox": 120.19, "no2": 30.27, "so2": 5.72, "vocs": 91.36, "co2": 411.29, "ch4": 2.14, "temp": 29.4, "riskScore": 0.3543, "risk": "Medium" }, { "date": "2023-08-09", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Wed", "season": "Summer", "pm25": 17.81, "pm10": 79.12, "co": 2.46, "nox": 119.2, "no2": 36.67, "so2": 4.73, "vocs": 31.85, "co2": 413.07, "ch4": 1.87, "temp": 25.02, "riskScore": 0.2497, "risk": "Low" }, { "date": "2023-08-10", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Thu", "season": "Summer", "pm25": 35.84, "pm10": 70.68, "co": 1.19, "nox": 36.83, "no2": 13.95, "so2": 10.15, "vocs": 159.1, "co2": 376.19, "ch4": 2.06, "temp": 30.16, "riskScore": 0.2535, "risk": "Low" }, { "date": "2023-08-11", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Fri", "season": "Summer", "pm25": 56.99, "pm10": 65.73, "co": 1.65, "nox": 40.55, "no2": 17.18, "so2": 14.52, "vocs": 98.68, "co2": 385.21, "ch4": 2.0, "temp": 19.89, "riskScore": 0.3557, "risk": "Medium" }, { "date": "2023-08-12", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Sat", "season": "Summer", "pm25": 36.72, "pm10": 70.07, "co": 2.2, "nox": 37.93, "no2": 14.92, "so2": 8.5, "vocs": 90.6, "co2": 379.82, "ch4": 1.86, "temp": 26.52, "riskScore": 0.3018, "risk": "Low" }, { "date": "2023-08-13", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Sun", "season": "Summer", "pm25": 92.84, "pm10": 139.16, "co": 1.86, "nox": 143.73, "no2": 89.02, "so2": 19.48, "vocs": 173.39, "co2": 507.07, "ch4": 2.42, "temp": 33.31, "riskScore": 0.6574, "risk": "Critical" }, { "date": "2023-08-14", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Mon", "season": "Summer", "pm25": 51.59, "pm10": 65.41, "co": 1.41, "nox": 28.75, "no2": 16.64, "so2": 8.17, "vocs": 44.52, "co2": 381.49, "ch4": 2.04, "temp": 36.96, "riskScore": 0.3209, "risk": "Low" }, { "date": "2023-08-15", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Tue", "season": "Summer", "pm25": 48.41, "pm10": 73.92, "co": 1.35, "nox": 24.9, "no2": 4.63, "so2": 7.57, "vocs": 99.07, "co2": 371.64, "ch4": 2.32, "temp": 26.08, "riskScore": 0.3209, "risk": "Low" }, { "date": "2023-08-16", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Wed", "season": "Summer", "pm25": 36.12, "pm10": 86.17, "co": 2.05, "nox": 92.97, "no2": 44.25, "so2": 3.44, "vocs": 74.24, "co2": 404.73, "ch4": 1.52, "temp": 31.2, "riskScore": 0.3231, "risk": "Low" }, { "date": "2023-08-17", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Thu", "season": "Summer", "pm25": 26.33, "pm10": 41.61, "co": 2.27, "nox": 111.22, "no2": 55.56, "so2": 4.92, "vocs": 84.45, "co2": 423.67, "ch4": 1.63, "temp": 33.44, "riskScore": 0.2067, "risk": "Low" }, { "date": "2023-08-18", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Fri", "season": "Summer", "pm25": 45.15, "pm10": 56.38, "co": 1.83, "nox": 113.72, "no2": 62.19, "so2": 5.5, "vocs": 61.66, "co2": 412.11, "ch4": 1.89, "temp": 28.39, "riskScore": 0.2954, "risk": "Low" }, { "date": "2023-08-19", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Sat", "season": "Summer", "pm25": 53.99, "pm10": 89.96, "co": 1.87, "nox": 35.37, "no2": 21.67, "so2": 8.84, "vocs": 121.6, "co2": 387.77, "ch4": 2.15, "temp": 25.18, "riskScore": 0.3987, "risk": "Medium" }, { "date": "2023-08-20", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Sun", "season": "Summer", "pm25": 37.81, "pm10": 86.38, "co": 2.55, "nox": 109.3, "no2": 43.89, "so2": 4.89, "vocs": 104.47, "co2": 413.74, "ch4": 1.54, "temp": 29.59, "riskScore": 0.353, "risk": "Medium" }, { "date": "2023-08-21", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Mon", "season": "Summer", "pm25": 27.0, "pm10": 59.05, "co": 2.42, "nox": 130.94, "no2": 35.43, "so2": 4.91, "vocs": 81.16, "co2": 397.53, "ch4": 1.68, "temp": 30.42, "riskScore": 0.2495, "risk": "Low" }, { "date": "2023-08-22", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Tue", "season": "Summer", "pm25": 35.99, "pm10": 68.31, "co": 1.32, "nox": 37.05, "no2": 22.45, "so2": 6.23, "vocs": 136.43, "co2": 388.7, "ch4": 2.12, "temp": 27.39, "riskScore": 0.2556, "risk": "Low" }, { "date": "2023-08-23", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Wed", "season": "Summer", "pm25": 74.16, "pm10": 141.04, "co": 3.84, "nox": 127.11, "no2": 73.73, "so2": 11.7, "vocs": 204.59, "co2": 555.0, "ch4": 2.9, "temp": 30.74, "riskScore": 0.6704, "risk": "Critical" }, { "date": "2023-08-24", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Thu", "season": "Summer", "pm25": 45.74, "pm10": 82.89, "co": 2.18, "nox": 81.98, "no2": 45.29, "so2": 5.3, "vocs": 77.64, "co2": 422.18, "ch4": 1.91, "temp": 32.88, "riskScore": 0.3637, "risk": "Medium" }, { "date": "2023-08-25", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Fri", "season": "Summer", "pm25": 46.65, "pm10": 90.92, "co": 2.05, "nox": 22.07, "no2": 20.3, "so2": 11.28, "vocs": 83.61, "co2": 372.39, "ch4": 2.08, "temp": 24.31, "riskScore": 0.3769, "risk": "Medium" }, { "date": "2023-08-26", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Sat", "season": "Summer", "pm25": 35.16, "pm10": 73.53, "co": 1.67, "nox": 77.31, "no2": 55.19, "so2": 6.02, "vocs": 100.61, "co2": 428.55, "ch4": 1.58, "temp": 31.78, "riskScore": 0.2778, "risk": "Low" }, { "date": "2023-08-27", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Sun", "season": "Summer", "pm25": 82.4, "pm10": 89.38, "co": 3.43, "nox": 145.62, "no2": 89.36, "so2": 24.49, "vocs": 111.41, "co2": 510.57, "ch4": 2.6, "temp": 32.94, "riskScore": 0.5893, "risk": "High" }, { "date": "2023-08-28", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Mon", "season": "Summer", "pm25": 28.59, "pm10": 66.83, "co": 2.49, "nox": 95.27, "no2": 25.13, "so2": 3.88, "vocs": 48.73, "co2": 423.56, "ch4": 1.73, "temp": 32.84, "riskScore": 0.274, "risk": "Low" }, { "date": "2023-08-29", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Tue", "season": "Summer", "pm25": 30.61, "pm10": 84.49, "co": 3.22, "nox": 83.26, "no2": 42.75, "so2": 6.49, "vocs": 91.8, "co2": 408.24, "ch4": 1.58, "temp": 27.68, "riskScore": 0.3492, "risk": "Medium" }, { "date": "2023-08-30", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Wed", "season": "Summer", "pm25": 41.45, "pm10": 89.79, "co": 0.8, "nox": 19.68, "no2": 20.57, "so2": 8.07, "vocs": 72.28, "co2": 374.72, "ch4": 1.87, "temp": 27.49, "riskScore": 0.2962, "risk": "Low" }, { "date": "2023-08-31", "year": 2023, "month": 8, "monthLabel": "Aug 2023", "dow": "Thu", "season": "Summer", "pm25": 106.53, "pm10": 110.16, "co": 2.86, "nox": 109.38, "no2": 61.7, "so2": 23.52, "vocs": 154.77, "co2": 511.21, "ch4": 2.06, "temp": 33.28, "riskScore": 0.7059, "risk": "Critical" }, { "date": "2023-09-01", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Fri", "season": "Autumn", "pm25": 58.69, "pm10": 69.67, "co": 1.32, "nox": 37.02, "no2": 14.69, "so2": 9.31, "vocs": 100.15, "co2": 400.59, "ch4": 2.04, "temp": 29.96, "riskScore": 0.3556, "risk": "Medium" }, { "date": "2023-09-02", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Sat", "season": "Autumn", "pm25": 45.11, "pm10": 80.12, "co": 2.28, "nox": 81.44, "no2": 35.15, "so2": 7.46, "vocs": 113.7, "co2": 411.2, "ch4": 2.2, "temp": 28.94, "riskScore": 0.3604, "risk": "Medium" }, { "date": "2023-09-03", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Sun", "season": "Autumn", "pm25": 82.54, "pm10": 111.99, "co": 3.31, "nox": 90.2, "no2": 39.24, "so2": 22.95, "vocs": 158.01, "co2": 502.69, "ch4": 2.56, "temp": 34.94, "riskScore": 0.6271, "risk": "High" }, { "date": "2023-09-04", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Mon", "season": "Autumn", "pm25": 36.51, "pm10": 71.48, "co": 2.47, "nox": 56.52, "no2": 51.13, "so2": 3.39, "vocs": 77.02, "co2": 422.61, "ch4": 1.87, "temp": 31.6, "riskScore": 0.3156, "risk": "Low" }, { "date": "2023-09-05", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Tue", "season": "Autumn", "pm25": 59.55, "pm10": 60.94, "co": 1.73, "nox": 23.97, "no2": 11.82, "so2": 9.73, "vocs": 140.19, "co2": 391.57, "ch4": 1.91, "temp": 28.99, "riskScore": 0.3612, "risk": "Medium" }, { "date": "2023-09-06", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Wed", "season": "Autumn", "pm25": 76.91, "pm10": 105.07, "co": 2.82, "nox": 144.7, "no2": 46.77, "so2": 17.54, "vocs": 141.45, "co2": 495.17, "ch4": 2.48, "temp": 33.96, "riskScore": 0.568, "risk": "Medium" }, { "date": "2023-09-07", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Thu", "season": "Autumn", "pm25": 40.43, "pm10": 41.73, "co": 2.1, "nox": 88.78, "no2": 50.9, "so2": 2.29, "vocs": 59.94, "co2": 422.87, "ch4": 1.7, "temp": 29.44, "riskScore": 0.2596, "risk": "Low" }, { "date": "2023-09-08", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Fri", "season": "Autumn", "pm25": 61.22, "pm10": 75.08, "co": 0.93, "nox": 32.36, "no2": 9.68, "so2": 5.67, "vocs": 100.45, "co2": 397.81, "ch4": 1.83, "temp": 27.93, "riskScore": 0.3588, "risk": "Medium" }, { "date": "2023-09-09", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Sat", "season": "Autumn", "pm25": 33.04, "pm10": 87.7, "co": 1.57, "nox": 18.54, "no2": 12.48, "so2": 9.26, "vocs": 49.01, "co2": 379.61, "ch4": 2.0, "temp": 26.94, "riskScore": 0.291, "risk": "Low" }, { "date": "2023-09-10", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Sun", "season": "Autumn", "pm25": 30.13, "pm10": 90.62, "co": 2.63, "nox": 137.27, "no2": 85.54, "so2": 18.63, "vocs": 181.63, "co2": 460.71, "ch4": 2.35, "temp": 33.69, "riskScore": 0.332, "risk": "Low" }, { "date": "2023-09-11", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Mon", "season": "Autumn", "pm25": 35.43, "pm10": 80.17, "co": 1.56, "nox": 102.36, "no2": 57.27, "so2": 4.47, "vocs": 100.05, "co2": 429.62, "ch4": 1.85, "temp": 29.56, "riskScore": 0.2866, "risk": "Low" }, { "date": "2023-09-12", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Tue", "season": "Autumn", "pm25": 71.78, "pm10": 136.67, "co": 2.5, "nox": 116.85, "no2": 73.31, "so2": 26.09, "vocs": 134.6, "co2": 495.39, "ch4": 2.85, "temp": 33.39, "riskScore": 0.5912, "risk": "High" }, { "date": "2023-09-13", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Wed", "season": "Autumn", "pm25": 82.03, "pm10": 86.63, "co": 2.59, "nox": 225.89, "no2": 79.37, "so2": 23.35, "vocs": 190.97, "co2": 502.61, "ch4": 2.1, "temp": 31.78, "riskScore": 0.5448, "risk": "Medium" }, { "date": "2023-09-14", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Thu", "season": "Autumn", "pm25": 25.0, "pm10": 48.25, "co": 2.43, "nox": 117.53, "no2": 41.82, "so2": 5.86, "vocs": 107.3, "co2": 435.19, "ch4": 1.82, "temp": 33.22, "riskScore": 0.2209, "risk": "Low" }, { "date": "2023-09-15", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Fri", "season": "Autumn", "pm25": 38.69, "pm10": 94.99, "co": 1.81, "nox": 26.15, "no2": 16.91, "so2": 8.28, "vocs": 46.74, "co2": 392.15, "ch4": 2.1, "temp": 39.78, "riskScore": 0.3396, "risk": "Medium" }, { "date": "2023-09-16", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Sat", "season": "Autumn", "pm25": 90.84, "pm10": 110.93, "co": 4.07, "nox": 169.48, "no2": 81.36, "so2": 16.76, "vocs": 116.29, "co2": 496.15, "ch4": 2.57, "temp": 33.97, "riskScore": 0.6952, "risk": "Critical" }, { "date": "2023-09-17", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Sun", "season": "Autumn", "pm25": 101.44, "pm10": 107.7, "co": 3.52, "nox": 159.75, "no2": 63.31, "so2": 23.77, "vocs": 116.45, "co2": 502.28, "ch4": 2.31, "temp": 32.67, "riskScore": 0.7095, "risk": "Critical" }, { "date": "2023-09-18", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Mon", "season": "Autumn", "pm25": 34.99, "pm10": 67.49, "co": 1.98, "nox": 23.85, "no2": 6.79, "so2": 6.01, "vocs": 69.19, "co2": 407.03, "ch4": 1.78, "temp": 29.64, "riskScore": 0.2798, "risk": "Low" }, { "date": "2023-09-19", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Tue", "season": "Autumn", "pm25": 26.11, "pm10": 74.33, "co": 1.18, "nox": 121.9, "no2": 54.73, "so2": 3.79, "vocs": 75.41, "co2": 416.08, "ch4": 2.0, "temp": 29.07, "riskScore": 0.2185, "risk": "Low" }, { "date": "2023-09-20", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Wed", "season": "Autumn", "pm25": 21.12, "pm10": 56.74, "co": 1.68, "nox": 87.57, "no2": 33.59, "so2": 2.97, "vocs": 98.83, "co2": 400.05, "ch4": 1.85, "temp": 31.45, "riskScore": 0.1863, "risk": "Low" }, { "date": "2023-09-21", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Thu", "season": "Autumn", "pm25": 33.61, "pm10": 101.45, "co": 1.17, "nox": 39.32, "no2": 13.82, "so2": 10.27, "vocs": 72.34, "co2": 383.91, "ch4": 1.89, "temp": 24.83, "riskScore": 0.3014, "risk": "Low" }, { "date": "2023-09-22", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Fri", "season": "Autumn", "pm25": 85.29, "pm10": 108.59, "co": 2.04, "nox": 95.38, "no2": 74.05, "so2": 10.44, "vocs": 147.94, "co2": 539.75, "ch4": 2.77, "temp": 33.21, "riskScore": 0.5754, "risk": "Medium" }, { "date": "2023-09-23", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Sat", "season": "Autumn", "pm25": 35.43, "pm10": 56.15, "co": 2.41, "nox": 147.41, "no2": 42.2, "so2": 7.79, "vocs": 39.02, "co2": 412.84, "ch4": 1.65, "temp": 29.5, "riskScore": 0.2794, "risk": "Low" }, { "date": "2023-09-24", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Sun", "season": "Autumn", "pm25": 82.23, "pm10": 106.41, "co": 2.95, "nox": 162.7, "no2": 101.21, "so2": 11.28, "vocs": 167.47, "co2": 509.01, "ch4": 2.37, "temp": 32.71, "riskScore": 0.5993, "risk": "High" }, { "date": "2023-09-25", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Mon", "season": "Autumn", "pm25": 57.43, "pm10": 122.52, "co": 3.19, "nox": 150.9, "no2": 72.96, "so2": 22.08, "vocs": 126.06, "co2": 508.86, "ch4": 2.35, "temp": 33.84, "riskScore": 0.5343, "risk": "Medium" }, { "date": "2023-09-26", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Tue", "season": "Autumn", "pm25": 84.24, "pm10": 114.19, "co": 3.16, "nox": 170.91, "no2": 66.41, "so2": 13.55, "vocs": 158.01, "co2": 478.38, "ch4": 2.73, "temp": 34.4, "riskScore": 0.6319, "risk": "High" }, { "date": "2023-09-27", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Wed", "season": "Autumn", "pm25": 43.3, "pm10": 56.34, "co": 1.98, "nox": 36.4, "no2": 15.74, "so2": 5.81, "vocs": 79.44, "co2": 405.36, "ch4": 2.11, "temp": 27.37, "riskScore": 0.2939, "risk": "Low" }, { "date": "2023-09-28", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Thu", "season": "Autumn", "pm25": 37.67, "pm10": 46.39, "co": 0.91, "nox": 104.5, "no2": 44.87, "so2": 4.57, "vocs": 67.39, "co2": 431.44, "ch4": 1.88, "temp": 30.86, "riskScore": 0.2028, "risk": "Low" }, { "date": "2023-09-29", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Fri", "season": "Autumn", "pm25": 50.96, "pm10": 54.65, "co": 2.23, "nox": 158.33, "no2": 59.55, "so2": 3.19, "vocs": 65.83, "co2": 402.45, "ch4": 1.71, "temp": 28.92, "riskScore": 0.3351, "risk": "Medium" }, { "date": "2023-09-30", "year": 2023, "month": 9, "monthLabel": "Sep 2023", "dow": "Sat", "season": "Autumn", "pm25": 57.28, "pm10": 126.43, "co": 2.11, "nox": 202.65, "no2": 70.28, "so2": 21.13, "vocs": 170.78, "co2": 534.05, "ch4": 2.56, "temp": 36.26, "riskScore": 0.4924, "risk": "Medium" }, { "date": "2023-10-01", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Sun", "season": "Autumn", "pm25": 62.51, "pm10": 77.68, "co": 3.0, "nox": 159.07, "no2": 81.29, "so2": 18.02, "vocs": 142.03, "co2": 531.58, "ch4": 2.03, "temp": 32.17, "riskScore": 0.4628, "risk": "Medium" }, { "date": "2023-10-02", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Mon", "season": "Autumn", "pm25": 43.27, "pm10": 73.65, "co": 1.07, "nox": 31.53, "no2": 19.95, "so2": 9.08, "vocs": 120.76, "co2": 401.93, "ch4": 1.86, "temp": 26.01, "riskScore": 0.2858, "risk": "Low" }, { "date": "2023-10-03", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Tue", "season": "Autumn", "pm25": 33.7, "pm10": 68.7, "co": 1.64, "nox": 82.33, "no2": 48.56, "so2": 8.3, "vocs": 101.41, "co2": 423.61, "ch4": 1.54, "temp": 31.14, "riskScore": 0.2609, "risk": "Low" }, { "date": "2023-10-04", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Wed", "season": "Autumn", "pm25": 36.87, "pm10": 44.17, "co": 2.54, "nox": 134.76, "no2": 37.3, "so2": 6.89, "vocs": 102.21, "co2": 414.34, "ch4": 1.68, "temp": 29.55, "riskScore": 0.2689, "risk": "Low" }, { "date": "2023-10-05", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Thu", "season": "Autumn", "pm25": 31.26, "pm10": 52.39, "co": 1.82, "nox": 85.15, "no2": 38.94, "so2": 5.17, "vocs": 69.6, "co2": 419.18, "ch4": 1.76, "temp": 30.06, "riskScore": 0.2279, "risk": "Low" }, { "date": "2023-10-06", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Fri", "season": "Autumn", "pm25": 46.16, "pm10": 60.93, "co": 1.09, "nox": 33.44, "no2": 14.63, "so2": 4.53, "vocs": 108.52, "co2": 399.34, "ch4": 1.95, "temp": 30.34, "riskScore": 0.275, "risk": "Low" }, { "date": "2023-10-07", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Sat", "season": "Autumn", "pm25": 23.38, "pm10": 55.37, "co": 2.07, "nox": 82.5, "no2": 29.33, "so2": 4.26, "vocs": 75.67, "co2": 414.96, "ch4": 1.6, "temp": 28.05, "riskScore": 0.2111, "risk": "Low" }, { "date": "2023-10-08", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Sun", "season": "Autumn", "pm25": 79.84, "pm10": 106.85, "co": 3.18, "nox": 92.03, "no2": 59.87, "so2": 23.37, "vocs": 78.89, "co2": 476.28, "ch4": 2.68, "temp": 34.43, "riskScore": 0.5999, "risk": "High" }, { "date": "2023-10-09", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Mon", "season": "Autumn", "pm25": 34.97, "pm10": 92.94, "co": 0.79, "nox": 20.1, "no2": 13.78, "so2": 8.77, "vocs": 90.3, "co2": 399.27, "ch4": 1.88, "temp": 30.23, "riskScore": 0.2739, "risk": "Low" }, { "date": "2023-10-10", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Tue", "season": "Autumn", "pm25": 24.98, "pm10": 48.71, "co": 2.49, "nox": 63.33, "no2": 34.99, "so2": 6.95, "vocs": 90.31, "co2": 425.22, "ch4": 1.58, "temp": 29.34, "riskScore": 0.2243, "risk": "Low" }, { "date": "2023-10-11", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Wed", "season": "Autumn", "pm25": 37.46, "pm10": 15.7, "co": 1.16, "nox": 131.02, "no2": 32.97, "so2": 9.53, "vocs": 82.33, "co2": 399.35, "ch4": 2.11, "temp": 32.21, "riskScore": 0.1552, "risk": "Low" }, { "date": "2023-10-12", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Thu", "season": "Autumn", "pm25": 56.14, "pm10": 79.77, "co": 1.73, "nox": 44.7, "no2": 16.48, "so2": 9.33, "vocs": 81.89, "co2": 386.04, "ch4": 1.91, "temp": 30.68, "riskScore": 0.3823, "risk": "Medium" }, { "date": "2023-10-13", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Fri", "season": "Autumn", "pm25": 104.35, "pm10": 138.35, "co": 3.51, "nox": 98.39, "no2": 97.42, "so2": 24.59, "vocs": 127.02, "co2": 479.25, "ch4": 2.69, "temp": 30.37, "riskScore": 0.7794, "risk": "Critical" }, { "date": "2023-10-14", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Sat", "season": "Autumn", "pm25": 54.14, "pm10": 47.32, "co": 0.86, "nox": 26.4, "no2": 13.63, "so2": 6.69, "vocs": 108.56, "co2": 406.94, "ch4": 2.24, "temp": 29.43, "riskScore": 0.273, "risk": "Low" }, { "date": "2023-10-15", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Sun", "season": "Autumn", "pm25": 32.15, "pm10": 104.41, "co": 1.57, "nox": 17.2, "no2": 15.95, "so2": 10.01, "vocs": 68.63, "co2": 399.38, "ch4": 2.0, "temp": 36.61, "riskScore": 0.319, "risk": "Low" }, { "date": "2023-10-16", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Mon", "season": "Autumn", "pm25": 38.76, "pm10": 64.67, "co": 2.19, "nox": 103.33, "no2": 38.68, "so2": 1.82, "vocs": 97.48, "co2": 431.02, "ch4": 1.49, "temp": 31.01, "riskScore": 0.2998, "risk": "Low" }, { "date": "2023-10-17", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Tue", "season": "Autumn", "pm25": 76.65, "pm10": 130.87, "co": 2.94, "nox": 145.11, "no2": 54.22, "so2": 20.43, "vocs": 143.57, "co2": 436.24, "ch4": 2.7, "temp": 32.37, "riskScore": 0.6211, "risk": "High" }, { "date": "2023-10-18", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Wed", "season": "Autumn", "pm25": 40.47, "pm10": 74.98, "co": 1.74, "nox": 17.02, "no2": 11.21, "so2": 8.05, "vocs": 92.49, "co2": 417.66, "ch4": 2.02, "temp": 25.47, "riskScore": 0.3066, "risk": "Low" }, { "date": "2023-10-19", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Thu", "season": "Autumn", "pm25": 28.33, "pm10": 59.29, "co": 1.93, "nox": 27.17, "no2": 11.9, "so2": 7.94, "vocs": 106.87, "co2": 390.91, "ch4": 1.89, "temp": 31.04, "riskScore": 0.2333, "risk": "Low" }, { "date": "2023-10-20", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Fri", "season": "Autumn", "pm25": 97.21, "pm10": 119.3, "co": 2.45, "nox": 199.75, "no2": 81.79, "so2": 26.74, "vocs": 127.05, "co2": 506.91, "ch4": 2.03, "temp": 33.94, "riskScore": 0.6649, "risk": "Critical" }, { "date": "2023-10-21", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Sat", "season": "Autumn", "pm25": 52.61, "pm10": 60.0, "co": 1.82, "nox": 70.45, "no2": 44.49, "so2": 9.17, "vocs": 59.7, "co2": 424.16, "ch4": 1.79, "temp": 28.04, "riskScore": 0.3336, "risk": "Low" }, { "date": "2023-10-22", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Sun", "season": "Autumn", "pm25": 82.94, "pm10": 101.92, "co": 3.0, "nox": 103.53, "no2": 73.87, "so2": 25.52, "vocs": 164.26, "co2": 488.21, "ch4": 2.17, "temp": 34.67, "riskScore": 0.5959, "risk": "High" }, { "date": "2023-10-23", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Mon", "season": "Autumn", "pm25": 103.85, "pm10": 131.48, "co": 3.35, "nox": 191.99, "no2": 49.87, "so2": 13.17, "vocs": 145.53, "co2": 535.93, "ch4": 2.71, "temp": 32.51, "riskScore": 0.7572, "risk": "Critical" }, { "date": "2023-10-24", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Tue", "season": "Autumn", "pm25": 38.82, "pm10": 85.68, "co": 1.11, "nox": 30.96, "no2": 16.75, "so2": 8.41, "vocs": 112.42, "co2": 375.49, "ch4": 2.29, "temp": 28.75, "riskScore": 0.2911, "risk": "Low" }, { "date": "2023-10-25", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Wed", "season": "Autumn", "pm25": 78.68, "pm10": 126.77, "co": 1.55, "nox": 144.56, "no2": 62.58, "so2": 13.75, "vocs": 150.66, "co2": 486.28, "ch4": 2.22, "temp": 32.52, "riskScore": 0.5594, "risk": "Medium" }, { "date": "2023-10-26", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Thu", "season": "Autumn", "pm25": 64.0, "pm10": 49.88, "co": 2.48, "nox": 49.93, "no2": 11.1, "so2": 8.35, "vocs": 112.77, "co2": 384.58, "ch4": 1.64, "temp": 32.47, "riskScore": 0.3929, "risk": "Medium" }, { "date": "2023-10-27", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Fri", "season": "Autumn", "pm25": 87.24, "pm10": 101.45, "co": 2.92, "nox": 153.26, "no2": 63.73, "so2": 15.04, "vocs": 170.68, "co2": 491.85, "ch4": 2.24, "temp": 30.94, "riskScore": 0.6096, "risk": "High" }, { "date": "2023-10-28", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Sat", "season": "Autumn", "pm25": 55.34, "pm10": 72.5, "co": 2.29, "nox": 14.23, "no2": 10.99, "so2": 7.85, "vocs": 98.11, "co2": 376.14, "ch4": 2.1, "temp": 32.47, "riskScore": 0.3901, "risk": "Medium" }, { "date": "2023-10-29", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Sun", "season": "Autumn", "pm25": 57.33, "pm10": 58.25, "co": 1.03, "nox": 27.69, "no2": 18.42, "so2": 6.07, "vocs": 84.72, "co2": 401.78, "ch4": 2.31, "temp": 23.26, "riskScore": 0.315, "risk": "Low" }, { "date": "2023-10-30", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Mon", "season": "Autumn", "pm25": 119.5, "pm10": 130.63, "co": 2.59, "nox": 155.6, "no2": 77.09, "so2": 26.9, "vocs": 147.5, "co2": 516.89, "ch4": 2.45, "temp": 30.86, "riskScore": 0.788, "risk": "Critical" }, { "date": "2023-10-31", "year": 2023, "month": 10, "monthLabel": "Oct 2023", "dow": "Tue", "season": "Autumn", "pm25": 46.58, "pm10": 59.39, "co": 1.63, "nox": 27.66, "no2": 19.04, "so2": 7.41, "vocs": 63.76, "co2": 402.08, "ch4": 2.23, "temp": 26.32, "riskScore": 0.2981, "risk": "Low" }, { "date": "2023-11-01", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Wed", "season": "Autumn", "pm25": 44.31, "pm10": 83.21, "co": 1.38, "nox": 26.97, "no2": 14.83, "so2": 9.12, "vocs": 90.3, "co2": 378.23, "ch4": 2.0, "temp": 27.0, "riskScore": 0.3222, "risk": "Low" }, { "date": "2023-11-02", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Thu", "season": "Autumn", "pm25": 36.46, "pm10": 50.79, "co": 1.94, "nox": 103.52, "no2": 55.89, "so2": 6.39, "vocs": 57.18, "co2": 411.95, "ch4": 1.72, "temp": 29.17, "riskScore": 0.2527, "risk": "Low" }, { "date": "2023-11-03", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Fri", "season": "Autumn", "pm25": 33.72, "pm10": 51.59, "co": 2.01, "nox": 26.76, "no2": 60.53, "so2": 7.18, "vocs": 72.47, "co2": 408.28, "ch4": 2.14, "temp": 33.79, "riskScore": 0.2455, "risk": "Low" }, { "date": "2023-11-04", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Sat", "season": "Autumn", "pm25": 38.82, "pm10": 64.2, "co": 0.67, "nox": 3.51, "no2": 21.76, "so2": 9.82, "vocs": 56.67, "co2": 370.51, "ch4": 2.13, "temp": 30.23, "riskScore": 0.2309, "risk": "Low" }, { "date": "2023-11-05", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Sun", "season": "Autumn", "pm25": 94.67, "pm10": 77.89, "co": 2.75, "nox": 184.61, "no2": 90.8, "so2": 18.49, "vocs": 71.91, "co2": 498.72, "ch4": 2.2, "temp": 31.97, "riskScore": 0.5892, "risk": "High" }, { "date": "2023-11-06", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Mon", "season": "Autumn", "pm25": 35.52, "pm10": 67.36, "co": 2.2, "nox": 67.86, "no2": 39.63, "so2": 5.28, "vocs": 69.45, "co2": 406.54, "ch4": 1.73, "temp": 28.49, "riskScore": 0.2917, "risk": "Low" }, { "date": "2023-11-07", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Tue", "season": "Autumn", "pm25": 102.0, "pm10": 145.41, "co": 2.95, "nox": 136.13, "no2": 83.61, "so2": 20.56, "vocs": 151.37, "co2": 535.17, "ch4": 2.91, "temp": 34.49, "riskScore": 0.7572, "risk": "Critical" }, { "date": "2023-11-08", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Wed", "season": "Autumn", "pm25": 98.31, "pm10": 102.46, "co": 2.44, "nox": 201.36, "no2": 43.79, "so2": 22.17, "vocs": 164.26, "co2": 508.49, "ch4": 2.88, "temp": 28.57, "riskScore": 0.6376, "risk": "High" }, { "date": "2023-11-09", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Thu", "season": "Autumn", "pm25": 36.99, "pm10": 71.87, "co": 1.08, "nox": 42.82, "no2": 18.17, "so2": 9.02, "vocs": 140.76, "co2": 388.16, "ch4": 1.65, "temp": 24.71, "riskScore": 0.256, "risk": "Low" }, { "date": "2023-11-10", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Fri", "season": "Autumn", "pm25": 40.59, "pm10": 109.57, "co": 4.8, "nox": 184.28, "no2": 44.01, "so2": 14.1, "vocs": 157.91, "co2": 472.84, "ch4": 2.08, "temp": 33.68, "riskScore": 0.5104, "risk": "Medium" }, { "date": "2023-11-11", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Sat", "season": "Autumn", "pm25": 77.25, "pm10": 86.6, "co": 2.09, "nox": 151.4, "no2": 68.39, "so2": 25.92, "vocs": 125.4, "co2": 492.52, "ch4": 2.17, "temp": 33.08, "riskScore": 0.5016, "risk": "Medium" }, { "date": "2023-11-12", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Sun", "season": "Autumn", "pm25": 72.03, "pm10": 88.64, "co": 3.45, "nox": 160.4, "no2": 107.67, "so2": 10.8, "vocs": 149.03, "co2": 502.46, "ch4": 2.47, "temp": 30.4, "riskScore": 0.5444, "risk": "Medium" }, { "date": "2023-11-13", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Mon", "season": "Autumn", "pm25": 34.33, "pm10": 94.81, "co": 1.08, "nox": 26.37, "no2": 12.24, "so2": 5.31, "vocs": 121.27, "co2": 389.85, "ch4": 1.66, "temp": 30.45, "riskScore": 0.2877, "risk": "Low" }, { "date": "2023-11-14", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Tue", "season": "Autumn", "pm25": 19.66, "pm10": 72.58, "co": 1.75, "nox": 79.32, "no2": 28.29, "so2": 4.23, "vocs": 71.93, "co2": 432.74, "ch4": 2.2, "temp": 27.26, "riskScore": 0.2132, "risk": "Low" }, { "date": "2023-11-15", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Wed", "season": "Autumn", "pm25": 69.12, "pm10": 124.0, "co": 3.94, "nox": 105.33, "no2": 71.41, "so2": 16.4, "vocs": 103.11, "co2": 523.65, "ch4": 2.47, "temp": 35.0, "riskScore": 0.6208, "risk": "High" }, { "date": "2023-11-16", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Thu", "season": "Autumn", "pm25": 35.61, "pm10": 61.12, "co": 1.09, "nox": 90.06, "no2": 36.84, "so2": 2.18, "vocs": 101.64, "co2": 409.41, "ch4": 2.2, "temp": 30.27, "riskScore": 0.2302, "risk": "Low" }, { "date": "2023-11-17", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Fri", "season": "Autumn", "pm25": 35.34, "pm10": 61.67, "co": 1.51, "nox": 95.52, "no2": 43.96, "so2": 6.39, "vocs": 94.69, "co2": 417.16, "ch4": 2.04, "temp": 31.79, "riskScore": 0.2488, "risk": "Low" }, { "date": "2023-11-18", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Sat", "season": "Autumn", "pm25": 35.23, "pm10": 94.92, "co": 1.83, "nox": 26.25, "no2": 12.75, "so2": 10.07, "vocs": 64.5, "co2": 390.46, "ch4": 2.09, "temp": 29.34, "riskScore": 0.3257, "risk": "Low" }, { "date": "2023-11-19", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Sun", "season": "Autumn", "pm25": 74.91, "pm10": 127.4, "co": 2.31, "nox": 146.29, "no2": 76.87, "so2": 17.52, "vocs": 144.52, "co2": 499.3, "ch4": 2.26, "temp": 30.77, "riskScore": 0.5785, "risk": "Medium" }, { "date": "2023-11-20", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Mon", "season": "Autumn", "pm25": 54.36, "pm10": 71.51, "co": 1.34, "nox": 33.13, "no2": 17.04, "so2": 8.87, "vocs": 94.0, "co2": 388.48, "ch4": 1.77, "temp": 30.15, "riskScore": 0.3413, "risk": "Medium" }, { "date": "2023-11-21", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Tue", "season": "Autumn", "pm25": 85.6, "pm10": 126.25, "co": 2.9, "nox": 185.78, "no2": 51.13, "so2": 23.66, "vocs": 167.71, "co2": 506.77, "ch4": 2.81, "temp": 34.74, "riskScore": 0.6488, "risk": "High" }, { "date": "2023-11-22", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Wed", "season": "Autumn", "pm25": 49.74, "pm10": 79.97, "co": 1.39, "nox": 119.86, "no2": 35.74, "so2": 6.08, "vocs": 99.57, "co2": 436.95, "ch4": 1.45, "temp": 31.41, "riskScore": 0.3397, "risk": "Medium" }, { "date": "2023-11-23", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Thu", "season": "Autumn", "pm25": 88.0, "pm10": 136.79, "co": 2.6, "nox": 186.55, "no2": 85.86, "so2": 24.36, "vocs": 140.55, "co2": 506.65, "ch4": 2.78, "temp": 32.55, "riskScore": 0.6654, "risk": "Critical" }, { "date": "2023-11-24", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Fri", "season": "Autumn", "pm25": 55.92, "pm10": 63.22, "co": 1.46, "nox": 37.59, "no2": 9.81, "so2": 9.92, "vocs": 108.55, "co2": 391.31, "ch4": 1.74, "temp": 28.32, "riskScore": 0.3378, "risk": "Medium" }, { "date": "2023-11-25", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Sat", "season": "Autumn", "pm25": 31.35, "pm10": 70.44, "co": 2.06, "nox": 32.15, "no2": 12.19, "so2": 4.89, "vocs": 143.65, "co2": 386.18, "ch4": 2.1, "temp": 26.55, "riskScore": 0.2732, "risk": "Low" }, { "date": "2023-11-26", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Sun", "season": "Autumn", "pm25": 73.7, "pm10": 106.34, "co": 3.78, "nox": 186.59, "no2": 81.94, "so2": 24.29, "vocs": 135.96, "co2": 461.1, "ch4": 2.84, "temp": 32.87, "riskScore": 0.5999, "risk": "High" }, { "date": "2023-11-27", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Mon", "season": "Autumn", "pm25": 16.86, "pm10": 61.62, "co": 1.54, "nox": 113.78, "no2": 47.03, "so2": 6.19, "vocs": 87.36, "co2": 427.67, "ch4": 1.59, "temp": 32.21, "riskScore": 0.171, "risk": "Low" }, { "date": "2023-11-28", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Tue", "season": "Autumn", "pm25": 62.15, "pm10": 43.47, "co": 1.22, "nox": 24.14, "no2": 16.65, "so2": 10.51, "vocs": 88.79, "co2": 370.31, "ch4": 2.02, "temp": 34.13, "riskScore": 0.3162, "risk": "Low" }, { "date": "2023-11-29", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Wed", "season": "Autumn", "pm25": 84.16, "pm10": 119.55, "co": 3.16, "nox": 159.66, "no2": 69.83, "so2": 15.93, "vocs": 174.7, "co2": 500.35, "ch4": 2.21, "temp": 35.61, "riskScore": 0.6416, "risk": "High" }, { "date": "2023-11-30", "year": 2023, "month": 11, "monthLabel": "Nov 2023", "dow": "Thu", "season": "Autumn", "pm25": 59.91, "pm10": 123.19, "co": 3.27, "nox": 129.67, "no2": 68.34, "so2": 16.91, "vocs": 112.58, "co2": 499.01, "ch4": 2.68, "temp": 34.59, "riskScore": 0.5498, "risk": "Medium" }, { "date": "2023-12-01", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Fri", "season": "Winter", "pm25": 99.03, "pm10": 100.48, "co": 2.33, "nox": 177.27, "no2": 76.89, "so2": 21.17, "vocs": 163.34, "co2": 476.07, "ch4": 3.01, "temp": 32.66, "riskScore": 0.6317, "risk": "High" }, { "date": "2023-12-02", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Sat", "season": "Winter", "pm25": 57.77, "pm10": 118.23, "co": 2.76, "nox": 139.75, "no2": 70.03, "so2": 20.44, "vocs": 224.68, "co2": 531.6, "ch4": 2.99, "temp": 34.51, "riskScore": 0.5084, "risk": "Medium" }, { "date": "2023-12-03", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Sun", "season": "Winter", "pm25": 49.46, "pm10": 60.24, "co": 1.89, "nox": 119.76, "no2": 53.01, "so2": 5.33, "vocs": 56.09, "co2": 412.58, "ch4": 1.7, "temp": 29.81, "riskScore": 0.3238, "risk": "Low" }, { "date": "2023-12-04", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Mon", "season": "Winter", "pm25": 77.99, "pm10": 128.24, "co": 3.92, "nox": 166.72, "no2": 67.99, "so2": 22.02, "vocs": 133.52, "co2": 488.69, "ch4": 2.86, "temp": 30.05, "riskScore": 0.666, "risk": "Critical" }, { "date": "2023-12-05", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Tue", "season": "Winter", "pm25": 103.3, "pm10": 70.36, "co": 3.17, "nox": 171.58, "no2": 78.13, "so2": 22.36, "vocs": 156.55, "co2": 525.66, "ch4": 2.66, "temp": 33.43, "riskScore": 0.6312, "risk": "High" }, { "date": "2023-12-06", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Wed", "season": "Winter", "pm25": 98.56, "pm10": 127.6, "co": 3.69, "nox": 120.96, "no2": 65.35, "so2": 16.93, "vocs": 128.71, "co2": 472.57, "ch4": 2.98, "temp": 34.66, "riskScore": 0.7422, "risk": "Critical" }, { "date": "2023-12-07", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Thu", "season": "Winter", "pm25": 34.34, "pm10": 81.08, "co": 0.97, "nox": 7.98, "no2": 3.51, "so2": 8.67, "vocs": 41.38, "co2": 386.2, "ch4": 1.86, "temp": 27.56, "riskScore": 0.2571, "risk": "Low" }, { "date": "2023-12-08", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Fri", "season": "Winter", "pm25": 82.14, "pm10": 108.44, "co": 2.26, "nox": 131.87, "no2": 49.25, "so2": 17.32, "vocs": 142.08, "co2": 499.09, "ch4": 2.64, "temp": 32.57, "riskScore": 0.5713, "risk": "Medium" }, { "date": "2023-12-09", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Sat", "season": "Winter", "pm25": 89.94, "pm10": 103.86, "co": 2.67, "nox": 180.1, "no2": 71.83, "so2": 27.73, "vocs": 222.43, "co2": 491.42, "ch4": 2.43, "temp": 34.19, "riskScore": 0.6147, "risk": "High" }, { "date": "2023-12-10", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Sun", "season": "Winter", "pm25": 85.72, "pm10": 117.28, "co": 3.52, "nox": 168.54, "no2": 92.64, "so2": 18.8, "vocs": 99.9, "co2": 483.35, "ch4": 2.46, "temp": 34.57, "riskScore": 0.6604, "risk": "Critical" }, { "date": "2023-12-11", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Mon", "season": "Winter", "pm25": 46.08, "pm10": 66.27, "co": 2.43, "nox": 54.73, "no2": 44.83, "so2": 1.41, "vocs": 66.78, "co2": 426.58, "ch4": 1.89, "temp": 32.63, "riskScore": 0.3452, "risk": "Medium" }, { "date": "2023-12-12", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Tue", "season": "Winter", "pm25": 39.29, "pm10": 65.69, "co": 2.81, "nox": 86.1, "no2": 38.7, "so2": 8.34, "vocs": 61.15, "co2": 416.78, "ch4": 2.07, "temp": 27.19, "riskScore": 0.332, "risk": "Low" }, { "date": "2023-12-13", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Wed", "season": "Winter", "pm25": 74.89, "pm10": 115.05, "co": 3.05, "nox": 137.98, "no2": 107.87, "so2": 19.62, "vocs": 140.93, "co2": 480.65, "ch4": 2.98, "temp": 30.06, "riskScore": 0.5887, "risk": "High" }, { "date": "2023-12-14", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Thu", "season": "Winter", "pm25": 45.72, "pm10": 87.09, "co": 1.8, "nox": 19.86, "no2": 19.24, "so2": 5.93, "vocs": 96.34, "co2": 378.13, "ch4": 2.04, "temp": 31.64, "riskScore": 0.3545, "risk": "Medium" }, { "date": "2023-12-15", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Fri", "season": "Winter", "pm25": 34.87, "pm10": 70.84, "co": 2.01, "nox": 119.59, "no2": 44.43, "so2": 1.55, "vocs": 65.21, "co2": 427.33, "ch4": 1.53, "temp": 29.98, "riskScore": 0.287, "risk": "Low" }, { "date": "2023-12-16", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Sat", "season": "Winter", "pm25": 85.69, "pm10": 144.6, "co": 3.38, "nox": 132.09, "no2": 34.15, "so2": 17.94, "vocs": 177.4, "co2": 508.56, "ch4": 2.42, "temp": 30.44, "riskScore": 0.7054, "risk": "Critical" }, { "date": "2023-12-17", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Sun", "season": "Winter", "pm25": 74.95, "pm10": 125.11, "co": 3.36, "nox": 137.04, "no2": 59.09, "so2": 28.34, "vocs": 153.65, "co2": 516.72, "ch4": 2.54, "temp": 33.48, "riskScore": 0.6216, "risk": "High" }, { "date": "2023-12-18", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Mon", "season": "Winter", "pm25": 25.52, "pm10": 69.08, "co": 1.65, "nox": 101.77, "no2": 31.04, "so2": 6.16, "vocs": 90.87, "co2": 419.72, "ch4": 1.91, "temp": 28.28, "riskScore": 0.2274, "risk": "Low" }, { "date": "2023-12-19", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Tue", "season": "Winter", "pm25": 35.77, "pm10": 61.86, "co": 1.88, "nox": 68.14, "no2": 43.8, "so2": 7.23, "vocs": 110.16, "co2": 445.02, "ch4": 1.39, "temp": 30.71, "riskScore": 0.2676, "risk": "Low" }, { "date": "2023-12-20", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Wed", "season": "Winter", "pm25": 29.09, "pm10": 71.45, "co": 2.38, "nox": 86.12, "no2": 53.31, "so2": 7.33, "vocs": 80.44, "co2": 426.17, "ch4": 1.75, "temp": 31.72, "riskScore": 0.2798, "risk": "Low" }, { "date": "2023-12-21", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Thu", "season": "Winter", "pm25": 34.7, "pm10": 51.81, "co": 1.95, "nox": 114.92, "no2": 37.68, "so2": 5.06, "vocs": 74.59, "co2": 437.05, "ch4": 2.28, "temp": 30.75, "riskScore": 0.2473, "risk": "Low" }, { "date": "2023-12-22", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Fri", "season": "Winter", "pm25": 35.87, "pm10": 67.72, "co": 1.55, "nox": 22.85, "no2": 11.95, "so2": 11.15, "vocs": 100.72, "co2": 383.26, "ch4": 2.24, "temp": 27.36, "riskScore": 0.2643, "risk": "Low" }, { "date": "2023-12-23", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Sat", "season": "Winter", "pm25": 79.08, "pm10": 108.96, "co": 2.81, "nox": 200.54, "no2": 97.66, "so2": 13.82, "vocs": 116.34, "co2": 483.68, "ch4": 2.57, "temp": 32.35, "riskScore": 0.584, "risk": "High" }, { "date": "2023-12-24", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Sun", "season": "Winter", "pm25": 42.07, "pm10": 101.23, "co": 1.54, "nox": 103.65, "no2": 21.74, "so2": 5.92, "vocs": 97.21, "co2": 413.54, "ch4": 1.65, "temp": 28.94, "riskScore": 0.3539, "risk": "Medium" }, { "date": "2023-12-25", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Mon", "season": "Winter", "pm25": 44.73, "pm10": 57.6, "co": 1.87, "nox": 32.05, "no2": 18.83, "so2": 4.77, "vocs": 107.49, "co2": 385.85, "ch4": 2.14, "temp": 36.44, "riskScore": 0.2978, "risk": "Low" }, { "date": "2023-12-26", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Tue", "season": "Winter", "pm25": 78.43, "pm10": 127.87, "co": 2.29, "nox": 127.86, "no2": 72.72, "so2": 22.3, "vocs": 155.85, "co2": 504.13, "ch4": 2.94, "temp": 33.9, "riskScore": 0.5935, "risk": "High" }, { "date": "2023-12-27", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Wed", "season": "Winter", "pm25": 52.36, "pm10": 54.49, "co": 1.11, "nox": 20.84, "no2": 9.31, "so2": 7.83, "vocs": 130.29, "co2": 406.79, "ch4": 2.18, "temp": 23.61, "riskScore": 0.2903, "risk": "Low" }, { "date": "2023-12-28", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Thu", "season": "Winter", "pm25": 26.55, "pm10": 67.39, "co": 1.34, "nox": 25.54, "no2": 15.57, "so2": 7.27, "vocs": 49.81, "co2": 386.94, "ch4": 2.13, "temp": 25.91, "riskScore": 0.2147, "risk": "Low" }, { "date": "2023-12-29", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Fri", "season": "Winter", "pm25": 71.2, "pm10": 139.89, "co": 2.84, "nox": 73.31, "no2": 72.12, "so2": 26.74, "vocs": 194.93, "co2": 473.48, "ch4": 2.91, "temp": 32.9, "riskScore": 0.6101, "risk": "High" }, { "date": "2023-12-30", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Sat", "season": "Winter", "pm25": 61.25, "pm10": 131.28, "co": 2.0, "nox": 170.1, "no2": 73.02, "so2": 16.18, "vocs": 118.05, "co2": 488.79, "ch4": 2.2, "temp": 29.58, "riskScore": 0.5134, "risk": "Medium" }, { "date": "2023-12-31", "year": 2023, "month": 12, "monthLabel": "Dec 2023", "dow": "Sun", "season": "Winter", "pm25": 57.66, "pm10": 66.64, "co": 1.07, "nox": 23.24, "no2": 9.53, "so2": 6.82, "vocs": 135.46, "co2": 411.17, "ch4": 1.83, "temp": 30.25, "riskScore": 0.3338, "risk": "Medium" }, { "date": "2024-01-01", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Mon", "season": "Winter", "pm25": 34.41, "pm10": 44.38, "co": 1.75, "nox": 22.09, "no2": 16.7, "so2": 11.59, "vocs": 119.92, "co2": 373.76, "ch4": 2.02, "temp": 27.8, "riskScore": 0.2233, "risk": "Low" }, { "date": "2024-01-02", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Tue", "season": "Winter", "pm25": 36.54, "pm10": 59.36, "co": 2.67, "nox": 101.66, "no2": 12.87, "so2": 5.51, "vocs": 89.67, "co2": 423.69, "ch4": 1.77, "temp": 32.21, "riskScore": 0.302, "risk": "Low" }, { "date": "2024-01-03", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Wed", "season": "Winter", "pm25": 72.28, "pm10": 124.87, "co": 3.69, "nox": 148.19, "no2": 86.92, "so2": 20.43, "vocs": 127.59, "co2": 495.66, "ch4": 2.66, "temp": 32.05, "riskScore": 0.625, "risk": "High" }, { "date": "2024-01-04", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Thu", "season": "Winter", "pm25": 71.83, "pm10": 138.63, "co": 2.19, "nox": 152.14, "no2": 31.76, "so2": 22.21, "vocs": 179.89, "co2": 508.17, "ch4": 3.05, "temp": 33.22, "riskScore": 0.5814, "risk": "High" }, { "date": "2024-01-05", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Fri", "season": "Winter", "pm25": 37.83, "pm10": 61.22, "co": 1.46, "nox": 34.6, "no2": 14.13, "so2": 5.34, "vocs": 98.47, "co2": 399.76, "ch4": 1.81, "temp": 30.95, "riskScore": 0.2565, "risk": "Low" }, { "date": "2024-01-06", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Sat", "season": "Winter", "pm25": 90.13, "pm10": 117.35, "co": 3.86, "nox": 95.86, "no2": 64.46, "so2": 15.15, "vocs": 154.64, "co2": 539.47, "ch4": 2.52, "temp": 29.67, "riskScore": 0.6948, "risk": "Critical" }, { "date": "2024-01-07", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Sun", "season": "Winter", "pm25": 58.17, "pm10": 41.82, "co": 1.11, "nox": 0.0, "no2": 17.86, "so2": 8.49, "vocs": 72.74, "co2": 380.3, "ch4": 2.02, "temp": 26.12, "riskScore": 0.2908, "risk": "Low" }, { "date": "2024-01-08", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Mon", "season": "Winter", "pm25": 35.1, "pm10": 94.0, "co": 1.96, "nox": 48.23, "no2": 13.81, "so2": 5.08, "vocs": 83.79, "co2": 384.09, "ch4": 2.12, "temp": 28.51, "riskScore": 0.3291, "risk": "Low" }, { "date": "2024-01-09", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Tue", "season": "Winter", "pm25": 75.19, "pm10": 120.5, "co": 4.39, "nox": 139.82, "no2": 45.36, "so2": 25.46, "vocs": 177.1, "co2": 545.61, "ch4": 2.15, "temp": 32.33, "riskScore": 0.6607, "risk": "Critical" }, { "date": "2024-01-10", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Wed", "season": "Winter", "pm25": 34.24, "pm10": 57.79, "co": 2.09, "nox": 92.24, "no2": 33.99, "so2": 5.53, "vocs": 67.07, "co2": 399.0, "ch4": 1.68, "temp": 32.2, "riskScore": 0.263, "risk": "Low" }, { "date": "2024-01-11", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Thu", "season": "Winter", "pm25": 35.25, "pm10": 36.85, "co": 2.54, "nox": 104.11, "no2": 61.96, "so2": 5.99, "vocs": 78.85, "co2": 422.11, "ch4": 1.84, "temp": 27.82, "riskScore": 0.248, "risk": "Low" }, { "date": "2024-01-12", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Fri", "season": "Winter", "pm25": 83.24, "pm10": 131.51, "co": 2.55, "nox": 120.63, "no2": 65.57, "so2": 22.69, "vocs": 102.87, "co2": 507.54, "ch4": 2.83, "temp": 37.37, "riskScore": 0.6327, "risk": "High" }, { "date": "2024-01-13", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Sat", "season": "Winter", "pm25": 16.12, "pm10": 51.05, "co": 1.21, "nox": 148.77, "no2": 42.71, "so2": 6.88, "vocs": 62.0, "co2": 407.79, "ch4": 1.78, "temp": 26.01, "riskScore": 0.1332, "risk": "Low" }, { "date": "2024-01-14", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Sun", "season": "Winter", "pm25": 63.27, "pm10": 71.38, "co": 1.47, "nox": 52.11, "no2": 16.76, "so2": 7.11, "vocs": 133.74, "co2": 366.06, "ch4": 2.0, "temp": 27.25, "riskScore": 0.3849, "risk": "Medium" }, { "date": "2024-01-15", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Mon", "season": "Winter", "pm25": 40.09, "pm10": 53.55, "co": 1.47, "nox": 62.9, "no2": 37.92, "so2": 7.41, "vocs": 49.46, "co2": 421.26, "ch4": 1.6, "temp": 28.41, "riskScore": 0.2522, "risk": "Low" }, { "date": "2024-01-16", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Tue", "season": "Winter", "pm25": 31.3, "pm10": 70.52, "co": 0.97, "nox": 15.66, "no2": 4.47, "so2": 10.17, "vocs": 75.39, "co2": 381.88, "ch4": 1.83, "temp": 27.57, "riskScore": 0.2238, "risk": "Low" }, { "date": "2024-01-17", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Wed", "season": "Winter", "pm25": 61.74, "pm10": 51.19, "co": 1.92, "nox": 26.04, "no2": 14.16, "so2": 4.56, "vocs": 77.1, "co2": 397.6, "ch4": 2.19, "temp": 26.23, "riskScore": 0.3605, "risk": "Medium" }, { "date": "2024-01-18", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Thu", "season": "Winter", "pm25": 46.4, "pm10": 97.48, "co": 2.9, "nox": 43.27, "no2": 30.76, "so2": 8.63, "vocs": 43.99, "co2": 421.47, "ch4": 1.84, "temp": 27.44, "riskScore": 0.4265, "risk": "Medium" }, { "date": "2024-01-19", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Fri", "season": "Winter", "pm25": 50.51, "pm10": 118.34, "co": 2.23, "nox": 150.52, "no2": 49.84, "so2": 14.23, "vocs": 124.65, "co2": 497.84, "ch4": 2.32, "temp": 33.64, "riskScore": 0.4535, "risk": "Medium" }, { "date": "2024-01-20", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Sat", "season": "Winter", "pm25": 83.83, "pm10": 135.92, "co": 3.57, "nox": 134.05, "no2": 68.94, "so2": 27.97, "vocs": 149.92, "co2": 487.65, "ch4": 2.71, "temp": 31.9, "riskScore": 0.6896, "risk": "Critical" }, { "date": "2024-01-21", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Sun", "season": "Winter", "pm25": 17.58, "pm10": 51.81, "co": 0.81, "nox": 72.7, "no2": 41.35, "so2": 6.99, "vocs": 92.92, "co2": 440.42, "ch4": 1.86, "temp": 28.45, "riskScore": 0.1229, "risk": "Low" }, { "date": "2024-01-22", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Mon", "season": "Winter", "pm25": 42.71, "pm10": 79.58, "co": 2.58, "nox": 124.89, "no2": 24.9, "so2": 4.42, "vocs": 50.62, "co2": 415.88, "ch4": 1.79, "temp": 30.96, "riskScore": 0.3628, "risk": "Medium" }, { "date": "2024-01-23", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Tue", "season": "Winter", "pm25": 66.46, "pm10": 138.94, "co": 3.53, "nox": 108.09, "no2": 88.33, "so2": 21.6, "vocs": 145.06, "co2": 510.23, "ch4": 2.9, "temp": 35.64, "riskScore": 0.6195, "risk": "High" }, { "date": "2024-01-24", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Wed", "season": "Winter", "pm25": 55.03, "pm10": 56.25, "co": 1.56, "nox": 35.25, "no2": 22.48, "so2": 7.67, "vocs": 97.07, "co2": 383.36, "ch4": 2.05, "temp": 28.73, "riskScore": 0.325, "risk": "Low" }, { "date": "2024-01-25", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Thu", "season": "Winter", "pm25": 47.41, "pm10": 80.96, "co": 2.05, "nox": 32.62, "no2": 5.25, "so2": 7.3, "vocs": 44.54, "co2": 379.14, "ch4": 2.25, "temp": 30.84, "riskScore": 0.3613, "risk": "Medium" }, { "date": "2024-01-26", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Fri", "season": "Winter", "pm25": 47.87, "pm10": 41.85, "co": 2.0, "nox": 110.73, "no2": 32.83, "so2": 7.2, "vocs": 79.64, "co2": 437.29, "ch4": 1.58, "temp": 30.43, "riskScore": 0.2873, "risk": "Low" }, { "date": "2024-01-27", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Sat", "season": "Winter", "pm25": 108.94, "pm10": 107.9, "co": 3.08, "nox": 114.08, "no2": 57.86, "so2": 18.84, "vocs": 151.93, "co2": 536.05, "ch4": 2.99, "temp": 35.61, "riskScore": 0.7221, "risk": "Critical" }, { "date": "2024-01-28", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Sun", "season": "Winter", "pm25": 83.01, "pm10": 113.62, "co": 3.09, "nox": 111.79, "no2": 75.03, "so2": 17.54, "vocs": 135.43, "co2": 487.48, "ch4": 2.53, "temp": 31.81, "riskScore": 0.6222, "risk": "High" }, { "date": "2024-01-29", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Mon", "season": "Winter", "pm25": 23.63, "pm10": 76.14, "co": 1.77, "nox": 13.69, "no2": 12.98, "so2": 9.01, "vocs": 119.78, "co2": 393.2, "ch4": 1.78, "temp": 30.94, "riskScore": 0.2379, "risk": "Low" }, { "date": "2024-01-30", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Tue", "season": "Winter", "pm25": 43.5, "pm10": 66.27, "co": 2.65, "nox": 102.69, "no2": 43.87, "so2": 5.65, "vocs": 105.68, "co2": 425.44, "ch4": 1.97, "temp": 31.03, "riskScore": 0.3439, "risk": "Medium" }, { "date": "2024-01-31", "year": 2024, "month": 1, "monthLabel": "Jan 2024", "dow": "Wed", "season": "Winter", "pm25": 52.76, "pm10": 69.93, "co": 1.72, "nox": 25.24, "no2": 14.65, "so2": 9.31, "vocs": 117.26, "co2": 377.17, "ch4": 2.0, "temp": 26.1, "riskScore": 0.3486, "risk": "Medium" }, { "date": "2024-02-01", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Thu", "season": "Winter", "pm25": 41.65, "pm10": 48.53, "co": 1.99, "nox": 111.3, "no2": 37.18, "so2": 1.24, "vocs": 98.62, "co2": 432.76, "ch4": 1.47, "temp": 29.42, "riskScore": 0.2726, "risk": "Low" }, { "date": "2024-02-02", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Fri", "season": "Winter", "pm25": 48.52, "pm10": 56.63, "co": 1.13, "nox": 29.51, "no2": 17.45, "so2": 8.3, "vocs": 109.51, "co2": 384.09, "ch4": 1.89, "temp": 27.17, "riskScore": 0.2786, "risk": "Low" }, { "date": "2024-02-03", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Sat", "season": "Winter", "pm25": 73.78, "pm10": 118.13, "co": 1.56, "nox": 28.2, "no2": 10.37, "so2": 11.37, "vocs": 91.41, "co2": 402.17, "ch4": 1.97, "temp": 27.28, "riskScore": 0.5226, "risk": "Medium" }, { "date": "2024-02-04", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Sun", "season": "Winter", "pm25": 22.28, "pm10": 50.54, "co": 1.08, "nox": 93.48, "no2": 27.61, "so2": 2.7, "vocs": 80.67, "co2": 411.21, "ch4": 2.19, "temp": 29.31, "riskScore": 0.1524, "risk": "Low" }, { "date": "2024-02-05", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Mon", "season": "Winter", "pm25": 37.17, "pm10": 55.45, "co": 1.09, "nox": 94.53, "no2": 47.66, "so2": 2.92, "vocs": 118.9, "co2": 414.02, "ch4": 1.87, "temp": 31.17, "riskScore": 0.226, "risk": "Low" }, { "date": "2024-02-06", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Tue", "season": "Winter", "pm25": 74.41, "pm10": 132.24, "co": 2.73, "nox": 109.95, "no2": 53.65, "so2": 23.24, "vocs": 181.34, "co2": 463.03, "ch4": 2.45, "temp": 33.38, "riskScore": 0.6045, "risk": "High" }, { "date": "2024-02-07", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Wed", "season": "Winter", "pm25": 33.47, "pm10": 48.75, "co": 1.75, "nox": 72.2, "no2": 47.56, "so2": 5.2, "vocs": 76.99, "co2": 418.2, "ch4": 1.83, "temp": 33.46, "riskScore": 0.2272, "risk": "Low" }, { "date": "2024-02-08", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Thu", "season": "Winter", "pm25": 39.61, "pm10": 90.98, "co": 1.03, "nox": 27.46, "no2": 11.69, "so2": 8.06, "vocs": 102.61, "co2": 387.02, "ch4": 1.93, "temp": 27.48, "riskScore": 0.3007, "risk": "Low" }, { "date": "2024-02-09", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Fri", "season": "Winter", "pm25": 43.76, "pm10": 70.43, "co": 2.08, "nox": 79.94, "no2": 29.4, "so2": 3.53, "vocs": 79.43, "co2": 420.38, "ch4": 2.06, "temp": 28.57, "riskScore": 0.3274, "risk": "Low" }, { "date": "2024-02-10", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Sat", "season": "Winter", "pm25": 40.46, "pm10": 27.43, "co": 2.21, "nox": 99.8, "no2": 41.58, "so2": 4.44, "vocs": 105.83, "co2": 433.1, "ch4": 1.76, "temp": 31.87, "riskScore": 0.2377, "risk": "Low" }, { "date": "2024-02-11", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Sun", "season": "Winter", "pm25": 75.48, "pm10": 121.62, "co": 3.29, "nox": 109.84, "no2": 82.95, "so2": 9.92, "vocs": 130.34, "co2": 477.55, "ch4": 2.68, "temp": 31.26, "riskScore": 0.6145, "risk": "High" }, { "date": "2024-02-12", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Mon", "season": "Winter", "pm25": 29.36, "pm10": 66.23, "co": 2.83, "nox": 70.72, "no2": 62.74, "so2": 4.52, "vocs": 80.18, "co2": 414.13, "ch4": 2.13, "temp": 29.18, "riskScore": 0.2914, "risk": "Low" }, { "date": "2024-02-13", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Tue", "season": "Winter", "pm25": 23.45, "pm10": 53.7, "co": 2.75, "nox": 80.03, "no2": 20.2, "so2": 5.26, "vocs": 65.65, "co2": 426.15, "ch4": 1.81, "temp": 29.05, "riskScore": 0.2391, "risk": "Low" }, { "date": "2024-02-14", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Wed", "season": "Winter", "pm25": 51.28, "pm10": 48.03, "co": 1.41, "nox": 9.83, "no2": 0.84, "so2": 9.63, "vocs": 103.22, "co2": 403.89, "ch4": 2.13, "temp": 32.85, "riskScore": 0.2868, "risk": "Low" }, { "date": "2024-02-15", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Thu", "season": "Winter", "pm25": 41.89, "pm10": 52.22, "co": 1.95, "nox": 73.1, "no2": 9.94, "so2": 5.37, "vocs": 91.58, "co2": 429.34, "ch4": 1.54, "temp": 29.66, "riskScore": 0.2789, "risk": "Low" }, { "date": "2024-02-16", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Fri", "season": "Winter", "pm25": 31.77, "pm10": 42.62, "co": 1.38, "nox": 104.94, "no2": 44.01, "so2": 6.12, "vocs": 27.56, "co2": 429.58, "ch4": 1.62, "temp": 30.41, "riskScore": 0.1919, "risk": "Low" }, { "date": "2024-02-17", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Sat", "season": "Winter", "pm25": 87.02, "pm10": 119.6, "co": 3.13, "nox": 150.65, "no2": 55.8, "so2": 19.66, "vocs": 139.5, "co2": 469.88, "ch4": 2.62, "temp": 35.03, "riskScore": 0.6525, "risk": "High" }, { "date": "2024-02-18", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Sun", "season": "Winter", "pm25": 29.74, "pm10": 47.55, "co": 1.31, "nox": 27.06, "no2": 16.35, "so2": 8.87, "vocs": 87.29, "co2": 391.24, "ch4": 1.7, "temp": 30.88, "riskScore": 0.1891, "risk": "Low" }, { "date": "2024-02-19", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Mon", "season": "Winter", "pm25": 34.22, "pm10": 61.11, "co": 1.46, "nox": 86.21, "no2": 40.24, "so2": 5.48, "vocs": 68.42, "co2": 432.88, "ch4": 1.92, "temp": 28.9, "riskScore": 0.2408, "risk": "Low" }, { "date": "2024-02-20", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Tue", "season": "Winter", "pm25": 86.14, "pm10": 127.14, "co": 3.51, "nox": 152.44, "no2": 69.43, "so2": 31.94, "vocs": 185.53, "co2": 502.24, "ch4": 2.8, "temp": 34.04, "riskScore": 0.6802, "risk": "Critical" }, { "date": "2024-02-21", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Wed", "season": "Winter", "pm25": 44.03, "pm10": 12.93, "co": 1.02, "nox": 32.11, "no2": 12.56, "so2": 11.19, "vocs": 100.48, "co2": 389.5, "ch4": 1.79, "temp": 29.42, "riskScore": 0.172, "risk": "Low" }, { "date": "2024-02-22", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Thu", "season": "Winter", "pm25": 35.51, "pm10": 70.61, "co": 1.5, "nox": 16.35, "no2": 18.51, "so2": 9.04, "vocs": 112.4, "co2": 394.15, "ch4": 2.32, "temp": 27.14, "riskScore": 0.2661, "risk": "Low" }, { "date": "2024-02-23", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Fri", "season": "Winter", "pm25": 66.98, "pm10": 121.96, "co": 2.63, "nox": 183.12, "no2": 66.16, "so2": 18.82, "vocs": 137.79, "co2": 505.9, "ch4": 2.05, "temp": 35.56, "riskScore": 0.5486, "risk": "Medium" }, { "date": "2024-02-24", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Sat", "season": "Winter", "pm25": 32.26, "pm10": 52.67, "co": 1.73, "nox": 127.69, "no2": 32.43, "so2": 4.06, "vocs": 104.68, "co2": 419.01, "ch4": 1.72, "temp": 26.43, "riskScore": 0.2285, "risk": "Low" }, { "date": "2024-02-25", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Sun", "season": "Winter", "pm25": 73.94, "pm10": 125.31, "co": 3.04, "nox": 190.82, "no2": 70.4, "so2": 20.11, "vocs": 172.13, "co2": 512.71, "ch4": 2.82, "temp": 32.34, "riskScore": 0.6032, "risk": "High" }, { "date": "2024-02-26", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Mon", "season": "Winter", "pm25": 71.48, "pm10": 141.5, "co": 3.28, "nox": 152.41, "no2": 60.12, "so2": 23.4, "vocs": 154.13, "co2": 504.31, "ch4": 2.56, "temp": 34.6, "riskScore": 0.6343, "risk": "High" }, { "date": "2024-02-27", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Tue", "season": "Winter", "pm25": 37.2, "pm10": 55.34, "co": 1.81, "nox": 94.98, "no2": 27.44, "so2": 6.33, "vocs": 59.7, "co2": 426.7, "ch4": 1.75, "temp": 29.02, "riskScore": 0.2586, "risk": "Low" }, { "date": "2024-02-28", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Wed", "season": "Winter", "pm25": 35.0, "pm10": 59.45, "co": 1.03, "nox": 12.08, "no2": 14.9, "so2": 7.33, "vocs": 104.55, "co2": 397.34, "ch4": 1.63, "temp": 27.72, "riskScore": 0.2216, "risk": "Low" }, { "date": "2024-02-29", "year": 2024, "month": 2, "monthLabel": "Feb 2024", "dow": "Thu", "season": "Winter", "pm25": 41.59, "pm10": 47.94, "co": 2.31, "nox": 107.68, "no2": 37.52, "so2": 7.64, "vocs": 62.51, "co2": 417.2, "ch4": 1.77, "temp": 29.63, "riskScore": 0.286, "risk": "Low" }, { "date": "2024-03-01", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Fri", "season": "Spring", "pm25": 50.73, "pm10": 68.37, "co": 1.29, "nox": 97.36, "no2": 39.59, "so2": 0.0, "vocs": 71.52, "co2": 421.34, "ch4": 1.75, "temp": 28.26, "riskScore": 0.3174, "risk": "Low" }, { "date": "2024-03-02", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Sat", "season": "Spring", "pm25": 38.09, "pm10": 76.13, "co": 1.26, "nox": 47.46, "no2": 19.61, "so2": 8.57, "vocs": 94.39, "co2": 380.12, "ch4": 2.3, "temp": 31.95, "riskScore": 0.2767, "risk": "Low" }, { "date": "2024-03-03", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Sun", "season": "Spring", "pm25": 59.0, "pm10": 79.56, "co": 0.45, "nox": 8.22, "no2": 12.35, "so2": 6.88, "vocs": 111.98, "co2": 415.49, "ch4": 2.11, "temp": 28.45, "riskScore": 0.3361, "risk": "Medium" }, { "date": "2024-03-04", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Mon", "season": "Spring", "pm25": 93.06, "pm10": 138.98, "co": 2.52, "nox": 153.92, "no2": 67.88, "so2": 17.62, "vocs": 125.22, "co2": 472.99, "ch4": 2.48, "temp": 29.63, "riskScore": 0.6876, "risk": "Critical" }, { "date": "2024-03-05", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Tue", "season": "Spring", "pm25": 59.96, "pm10": 140.25, "co": 3.13, "nox": 97.14, "no2": 65.21, "so2": 14.75, "vocs": 137.93, "co2": 519.69, "ch4": 2.87, "temp": 31.16, "riskScore": 0.5759, "risk": "Medium" }, { "date": "2024-03-06", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Wed", "season": "Spring", "pm25": 32.5, "pm10": 46.77, "co": 1.99, "nox": 82.1, "no2": 37.56, "so2": 4.21, "vocs": 75.31, "co2": 419.72, "ch4": 1.61, "temp": 30.74, "riskScore": 0.2302, "risk": "Low" }, { "date": "2024-03-07", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Thu", "season": "Spring", "pm25": 35.74, "pm10": 98.97, "co": 1.27, "nox": 32.27, "no2": 18.18, "so2": 6.36, "vocs": 69.52, "co2": 388.76, "ch4": 1.79, "temp": 27.97, "riskScore": 0.3104, "risk": "Low" }, { "date": "2024-03-08", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Fri", "season": "Spring", "pm25": 41.71, "pm10": 69.06, "co": 2.32, "nox": 90.2, "no2": 29.82, "so2": 2.95, "vocs": 72.53, "co2": 429.28, "ch4": 1.7, "temp": 27.69, "riskScore": 0.3268, "risk": "Low" }, { "date": "2024-03-09", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Sat", "season": "Spring", "pm25": 38.78, "pm10": 93.85, "co": 1.93, "nox": 38.27, "no2": 15.79, "so2": 5.46, "vocs": 105.28, "co2": 386.24, "ch4": 2.27, "temp": 31.88, "riskScore": 0.3432, "risk": "Medium" }, { "date": "2024-03-10", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Sun", "season": "Spring", "pm25": 23.83, "pm10": 69.76, "co": 1.79, "nox": 118.12, "no2": 31.18, "so2": 0.0, "vocs": 80.18, "co2": 415.54, "ch4": 1.99, "temp": 30.28, "riskScore": 0.2276, "risk": "Low" }, { "date": "2024-03-11", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Mon", "season": "Spring", "pm25": 79.23, "pm10": 115.06, "co": 2.74, "nox": 214.35, "no2": 83.42, "so2": 24.85, "vocs": 164.14, "co2": 494.49, "ch4": 2.44, "temp": 33.38, "riskScore": 0.5933, "risk": "High" }, { "date": "2024-03-12", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Tue", "season": "Spring", "pm25": 42.22, "pm10": 55.69, "co": 2.29, "nox": 104.27, "no2": 44.41, "so2": 3.86, "vocs": 119.81, "co2": 433.03, "ch4": 2.01, "temp": 30.65, "riskScore": 0.3022, "risk": "Low" }, { "date": "2024-03-13", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Wed", "season": "Spring", "pm25": 63.35, "pm10": 76.58, "co": 1.69, "nox": 20.83, "no2": 18.35, "so2": 10.12, "vocs": 104.95, "co2": 389.3, "ch4": 1.77, "temp": 27.54, "riskScore": 0.4051, "risk": "Medium" }, { "date": "2024-03-14", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Thu", "season": "Spring", "pm25": 24.23, "pm10": 75.54, "co": 1.47, "nox": 130.3, "no2": 50.31, "so2": 4.83, "vocs": 79.55, "co2": 424.15, "ch4": 1.83, "temp": 35.69, "riskScore": 0.2257, "risk": "Low" }, { "date": "2024-03-15", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Fri", "season": "Spring", "pm25": 61.54, "pm10": 72.08, "co": 1.61, "nox": 33.9, "no2": 3.9, "so2": 5.6, "vocs": 122.18, "co2": 388.53, "ch4": 2.11, "temp": 32.91, "riskScore": 0.3854, "risk": "Medium" }, { "date": "2024-03-16", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Sat", "season": "Spring", "pm25": 46.44, "pm10": 75.28, "co": 1.39, "nox": 83.93, "no2": 37.87, "so2": 1.81, "vocs": 39.22, "co2": 431.23, "ch4": 1.96, "temp": 30.77, "riskScore": 0.3165, "risk": "Low" }, { "date": "2024-03-17", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Sun", "season": "Spring", "pm25": 84.69, "pm10": 155.65, "co": 2.88, "nox": 101.08, "no2": 70.83, "so2": 16.47, "vocs": 165.65, "co2": 472.8, "ch4": 2.21, "temp": 31.34, "riskScore": 0.6996, "risk": "Critical" }, { "date": "2024-03-18", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Mon", "season": "Spring", "pm25": 41.26, "pm10": 92.1, "co": 1.28, "nox": 28.27, "no2": 13.37, "so2": 8.11, "vocs": 107.12, "co2": 390.22, "ch4": 2.16, "temp": 28.39, "riskScore": 0.3213, "risk": "Low" }, { "date": "2024-03-19", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Tue", "season": "Spring", "pm25": 64.78, "pm10": 106.83, "co": 3.04, "nox": 215.19, "no2": 80.48, "so2": 23.94, "vocs": 130.89, "co2": 546.12, "ch4": 2.14, "temp": 33.91, "riskScore": 0.5294, "risk": "Medium" }, { "date": "2024-03-20", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Wed", "season": "Spring", "pm25": 90.97, "pm10": 130.77, "co": 4.14, "nox": 171.47, "no2": 105.92, "so2": 30.93, "vocs": 129.4, "co2": 507.66, "ch4": 2.65, "temp": 29.62, "riskScore": 0.7361, "risk": "Critical" }, { "date": "2024-03-21", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Thu", "season": "Spring", "pm25": 54.94, "pm10": 89.28, "co": 1.79, "nox": 9.26, "no2": 14.89, "so2": 10.24, "vocs": 95.33, "co2": 393.51, "ch4": 2.07, "temp": 27.19, "riskScore": 0.3977, "risk": "Medium" }, { "date": "2024-03-22", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Fri", "season": "Spring", "pm25": 30.66, "pm10": 60.31, "co": 1.71, "nox": 58.2, "no2": 32.82, "so2": 3.43, "vocs": 93.38, "co2": 414.58, "ch4": 1.72, "temp": 28.5, "riskScore": 0.2355, "risk": "Low" }, { "date": "2024-03-23", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Sat", "season": "Spring", "pm25": 46.72, "pm10": 74.08, "co": 1.33, "nox": 33.06, "no2": 15.02, "so2": 6.61, "vocs": 98.64, "co2": 373.74, "ch4": 1.85, "temp": 30.67, "riskScore": 0.3127, "risk": "Low" }, { "date": "2024-03-24", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Sun", "season": "Spring", "pm25": 26.03, "pm10": 72.74, "co": 2.24, "nox": 79.78, "no2": 39.82, "so2": 8.09, "vocs": 101.97, "co2": 418.72, "ch4": 1.88, "temp": 31.38, "riskScore": 0.2629, "risk": "Low" }, { "date": "2024-03-25", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Mon", "season": "Spring", "pm25": 44.56, "pm10": 94.87, "co": 1.09, "nox": 99.57, "no2": 45.05, "so2": 5.17, "vocs": 65.73, "co2": 412.94, "ch4": 1.52, "temp": 33.41, "riskScore": 0.3322, "risk": "Low" }, { "date": "2024-03-26", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Tue", "season": "Spring", "pm25": 55.67, "pm10": 49.81, "co": 1.6, "nox": 22.33, "no2": 15.34, "so2": 10.06, "vocs": 112.54, "co2": 390.78, "ch4": 2.08, "temp": 28.6, "riskScore": 0.3175, "risk": "Low" }, { "date": "2024-03-27", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Wed", "season": "Spring", "pm25": 104.46, "pm10": 125.24, "co": 2.96, "nox": 173.91, "no2": 90.95, "so2": 14.19, "vocs": 98.11, "co2": 464.93, "ch4": 2.41, "temp": 33.63, "riskScore": 0.7303, "risk": "Critical" }, { "date": "2024-03-28", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Thu", "season": "Spring", "pm25": 27.65, "pm10": 35.15, "co": 1.97, "nox": 91.87, "no2": 30.63, "so2": 3.7, "vocs": 92.21, "co2": 411.7, "ch4": 1.92, "temp": 31.33, "riskScore": 0.1868, "risk": "Low" }, { "date": "2024-03-29", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Fri", "season": "Spring", "pm25": 41.16, "pm10": 56.7, "co": 1.6, "nox": 108.84, "no2": 37.23, "so2": 5.73, "vocs": 99.86, "co2": 426.74, "ch4": 2.14, "temp": 30.53, "riskScore": 0.2686, "risk": "Low" }, { "date": "2024-03-30", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Sat", "season": "Spring", "pm25": 38.11, "pm10": 79.66, "co": 1.45, "nox": 40.34, "no2": 12.96, "so2": 9.82, "vocs": 103.09, "co2": 387.89, "ch4": 2.15, "temp": 28.98, "riskScore": 0.2921, "risk": "Low" }, { "date": "2024-03-31", "year": 2024, "month": 3, "monthLabel": "Mar 2024", "dow": "Sun", "season": "Spring", "pm25": 84.81, "pm10": 121.68, "co": 3.74, "nox": 91.99, "no2": 80.45, "so2": 22.04, "vocs": 150.49, "co2": 524.26, "ch4": 2.74, "temp": 31.3, "riskScore": 0.6748, "risk": "Critical" }, { "date": "2024-04-01", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Mon", "season": "Spring", "pm25": 51.84, "pm10": 117.02, "co": 1.96, "nox": 163.19, "no2": 43.74, "so2": 21.17, "vocs": 178.63, "co2": 533.16, "ch4": 2.2, "temp": 34.15, "riskScore": 0.4445, "risk": "Medium" }, { "date": "2024-04-02", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Tue", "season": "Spring", "pm25": 49.09, "pm10": 141.82, "co": 2.45, "nox": 196.61, "no2": 40.07, "so2": 22.3, "vocs": 156.8, "co2": 472.11, "ch4": 2.8, "temp": 33.36, "riskScore": 0.5017, "risk": "Medium" }, { "date": "2024-04-03", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Wed", "season": "Spring", "pm25": 80.08, "pm10": 141.57, "co": 2.48, "nox": 92.24, "no2": 58.77, "so2": 15.11, "vocs": 180.19, "co2": 474.28, "ch4": 2.66, "temp": 31.18, "riskScore": 0.6353, "risk": "High" }, { "date": "2024-04-04", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Thu", "season": "Spring", "pm25": 91.81, "pm10": 115.78, "co": 3.07, "nox": 146.37, "no2": 83.61, "so2": 23.31, "vocs": 152.27, "co2": 470.4, "ch4": 1.99, "temp": 32.65, "riskScore": 0.6633, "risk": "Critical" }, { "date": "2024-04-05", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Fri", "season": "Spring", "pm25": 33.25, "pm10": 65.99, "co": 1.74, "nox": 109.01, "no2": 45.04, "so2": 5.58, "vocs": 69.86, "co2": 408.01, "ch4": 2.16, "temp": 30.03, "riskScore": 0.2586, "risk": "Low" }, { "date": "2024-04-06", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Sat", "season": "Spring", "pm25": 97.73, "pm10": 132.84, "co": 3.91, "nox": 138.99, "no2": 67.25, "so2": 26.27, "vocs": 126.14, "co2": 494.96, "ch4": 2.73, "temp": 33.17, "riskScore": 0.7585, "risk": "Critical" }, { "date": "2024-04-07", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Sun", "season": "Spring", "pm25": 90.15, "pm10": 114.61, "co": 2.98, "nox": 126.11, "no2": 72.52, "so2": 27.91, "vocs": 140.71, "co2": 529.13, "ch4": 2.41, "temp": 34.02, "riskScore": 0.6499, "risk": "High" }, { "date": "2024-04-08", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Mon", "season": "Spring", "pm25": 26.63, "pm10": 69.07, "co": 1.26, "nox": 95.86, "no2": 49.39, "so2": 4.44, "vocs": 52.75, "co2": 400.91, "ch4": 1.93, "temp": 35.12, "riskScore": 0.2142, "risk": "Low" }, { "date": "2024-04-09", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Tue", "season": "Spring", "pm25": 40.05, "pm10": 56.7, "co": 1.61, "nox": 13.73, "no2": 25.11, "so2": 10.51, "vocs": 80.52, "co2": 394.17, "ch4": 2.24, "temp": 25.54, "riskScore": 0.2641, "risk": "Low" }, { "date": "2024-04-10", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Wed", "season": "Spring", "pm25": 93.21, "pm10": 93.43, "co": 3.4, "nox": 157.91, "no2": 88.33, "so2": 22.59, "vocs": 222.19, "co2": 492.69, "ch4": 3.35, "temp": 36.27, "riskScore": 0.6419, "risk": "High" }, { "date": "2024-04-11", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Thu", "season": "Spring", "pm25": 89.15, "pm10": 78.41, "co": 3.58, "nox": 170.32, "no2": 53.81, "so2": 21.38, "vocs": 190.72, "co2": 524.49, "ch4": 2.84, "temp": 31.95, "riskScore": 0.604, "risk": "High" }, { "date": "2024-04-12", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Fri", "season": "Spring", "pm25": 39.22, "pm10": 44.74, "co": 1.23, "nox": 33.69, "no2": 17.17, "so2": 6.2, "vocs": 79.54, "co2": 378.35, "ch4": 1.42, "temp": 27.74, "riskScore": 0.2207, "risk": "Low" }, { "date": "2024-04-13", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Sat", "season": "Spring", "pm25": 32.86, "pm10": 84.59, "co": 1.51, "nox": 54.25, "no2": 10.83, "so2": 10.8, "vocs": 109.17, "co2": 386.56, "ch4": 1.98, "temp": 31.45, "riskScore": 0.2818, "risk": "Low" }, { "date": "2024-04-14", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Sun", "season": "Spring", "pm25": 33.19, "pm10": 61.88, "co": 1.47, "nox": 36.55, "no2": 15.47, "so2": 8.35, "vocs": 75.87, "co2": 401.32, "ch4": 1.68, "temp": 25.91, "riskScore": 0.2383, "risk": "Low" }, { "date": "2024-04-15", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Mon", "season": "Spring", "pm25": 61.82, "pm10": 126.5, "co": 4.56, "nox": 128.27, "no2": 69.13, "so2": 28.09, "vocs": 196.8, "co2": 532.75, "ch4": 3.22, "temp": 33.87, "riskScore": 0.6223, "risk": "High" }, { "date": "2024-04-16", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Tue", "season": "Spring", "pm25": 32.35, "pm10": 77.7, "co": 1.39, "nox": 12.98, "no2": 12.19, "so2": 7.34, "vocs": 141.87, "co2": 367.99, "ch4": 1.6, "temp": 28.1, "riskScore": 0.261, "risk": "Low" }, { "date": "2024-04-17", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Wed", "season": "Spring", "pm25": 36.94, "pm10": 76.39, "co": 1.82, "nox": 56.62, "no2": 30.68, "so2": 2.79, "vocs": 97.34, "co2": 416.72, "ch4": 1.83, "temp": 28.24, "riskScore": 0.2974, "risk": "Low" }, { "date": "2024-04-18", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Thu", "season": "Spring", "pm25": 101.94, "pm10": 123.59, "co": 3.03, "nox": 157.56, "no2": 88.92, "so2": 20.78, "vocs": 137.43, "co2": 527.86, "ch4": 2.52, "temp": 31.66, "riskScore": 0.7194, "risk": "Critical" }, { "date": "2024-04-19", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Fri", "season": "Spring", "pm25": 51.44, "pm10": 79.95, "co": 1.8, "nox": 21.73, "no2": 18.85, "so2": 8.06, "vocs": 82.21, "co2": 385.46, "ch4": 1.69, "temp": 25.0, "riskScore": 0.3657, "risk": "Medium" }, { "date": "2024-04-20", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Sat", "season": "Spring", "pm25": 74.0, "pm10": 99.4, "co": 4.52, "nox": 117.65, "no2": 75.66, "so2": 18.22, "vocs": 111.01, "co2": 477.51, "ch4": 2.83, "temp": 30.05, "riskScore": 0.6217, "risk": "High" }, { "date": "2024-04-21", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Sun", "season": "Spring", "pm25": 58.69, "pm10": 148.29, "co": 3.45, "nox": 163.48, "no2": 65.05, "so2": 17.16, "vocs": 170.15, "co2": 482.07, "ch4": 2.16, "temp": 30.82, "riskScore": 0.6002, "risk": "High" }, { "date": "2024-04-22", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Mon", "season": "Spring", "pm25": 34.78, "pm10": 70.11, "co": 1.29, "nox": 14.68, "no2": 20.75, "so2": 7.59, "vocs": 127.96, "co2": 384.76, "ch4": 1.85, "temp": 30.63, "riskScore": 0.2525, "risk": "Low" }, { "date": "2024-04-23", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Tue", "season": "Spring", "pm25": 31.18, "pm10": 30.36, "co": 2.46, "nox": 85.74, "no2": 28.21, "so2": 5.07, "vocs": 56.19, "co2": 419.09, "ch4": 1.76, "temp": 31.31, "riskScore": 0.2149, "risk": "Low" }, { "date": "2024-04-24", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Wed", "season": "Spring", "pm25": 46.65, "pm10": 95.36, "co": 1.81, "nox": 50.03, "no2": 13.98, "so2": 8.7, "vocs": 124.5, "co2": 397.6, "ch4": 1.73, "temp": 25.45, "riskScore": 0.3744, "risk": "Medium" }, { "date": "2024-04-25", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Thu", "season": "Spring", "pm25": 40.93, "pm10": 109.49, "co": 3.15, "nox": 129.07, "no2": 55.69, "so2": 17.92, "vocs": 116.21, "co2": 515.33, "ch4": 2.7, "temp": 32.72, "riskScore": 0.4373, "risk": "Medium" }, { "date": "2024-04-26", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Fri", "season": "Spring", "pm25": 55.14, "pm10": 69.56, "co": 2.08, "nox": 63.15, "no2": 32.05, "so2": 6.38, "vocs": 88.46, "co2": 441.61, "ch4": 1.68, "temp": 29.85, "riskScore": 0.3743, "risk": "Medium" }, { "date": "2024-04-27", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Sat", "season": "Spring", "pm25": 50.49, "pm10": 119.58, "co": 4.06, "nox": 158.81, "no2": 73.74, "so2": 18.37, "vocs": 153.74, "co2": 507.63, "ch4": 2.39, "temp": 32.0, "riskScore": 0.5383, "risk": "Medium" }, { "date": "2024-04-28", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Sun", "season": "Spring", "pm25": 28.32, "pm10": 71.32, "co": 1.56, "nox": 124.99, "no2": 39.18, "so2": 2.81, "vocs": 115.88, "co2": 405.41, "ch4": 1.4, "temp": 30.2, "riskScore": 0.2394, "risk": "Low" }, { "date": "2024-04-29", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Mon", "season": "Spring", "pm25": 59.39, "pm10": 139.35, "co": 2.56, "nox": 192.22, "no2": 51.87, "so2": 12.94, "vocs": 145.9, "co2": 502.9, "ch4": 2.86, "temp": 28.51, "riskScore": 0.5462, "risk": "Medium" }, { "date": "2024-04-30", "year": 2024, "month": 4, "monthLabel": "Apr 2024", "dow": "Tue", "season": "Spring", "pm25": 26.8, "pm10": 47.44, "co": 0.96, "nox": 33.88, "no2": 10.87, "so2": 11.61, "vocs": 101.77, "co2": 378.57, "ch4": 2.21, "temp": 27.77, "riskScore": 0.1606, "risk": "Low" }, { "date": "2024-05-01", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Wed", "season": "Spring", "pm25": 32.73, "pm10": 57.87, "co": 2.6, "nox": 103.39, "no2": 47.29, "so2": 6.28, "vocs": 85.18, "co2": 404.81, "ch4": 1.9, "temp": 31.25, "riskScore": 0.2797, "risk": "Low" }, { "date": "2024-05-02", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Thu", "season": "Spring", "pm25": 57.0, "pm10": 61.75, "co": 1.8, "nox": 32.99, "no2": 11.61, "so2": 8.73, "vocs": 71.55, "co2": 381.5, "ch4": 2.16, "temp": 26.72, "riskScore": 0.3548, "risk": "Medium" }, { "date": "2024-05-03", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Fri", "season": "Spring", "pm25": 38.07, "pm10": 69.85, "co": 1.76, "nox": 29.71, "no2": 15.59, "so2": 8.88, "vocs": 77.03, "co2": 373.72, "ch4": 1.73, "temp": 34.41, "riskScore": 0.2873, "risk": "Low" }, { "date": "2024-05-04", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Sat", "season": "Spring", "pm25": 51.98, "pm10": 25.28, "co": 2.73, "nox": 128.16, "no2": 46.49, "so2": 8.28, "vocs": 56.37, "co2": 412.61, "ch4": 2.01, "temp": 29.93, "riskScore": 0.3062, "risk": "Low" }, { "date": "2024-05-05", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Sun", "season": "Spring", "pm25": 52.41, "pm10": 57.59, "co": 4.41, "nox": 156.3, "no2": 66.04, "so2": 21.99, "vocs": 142.44, "co2": 504.61, "ch4": 2.37, "temp": 33.67, "riskScore": 0.4452, "risk": "Medium" }, { "date": "2024-05-06", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Mon", "season": "Spring", "pm25": 28.29, "pm10": 59.11, "co": 1.27, "nox": 30.41, "no2": 19.02, "so2": 7.65, "vocs": 100.63, "co2": 374.88, "ch4": 1.63, "temp": 26.91, "riskScore": 0.203, "risk": "Low" }, { "date": "2024-05-07", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Tue", "season": "Spring", "pm25": 59.23, "pm10": 97.73, "co": 1.95, "nox": 24.47, "no2": 13.73, "so2": 6.49, "vocs": 109.57, "co2": 372.57, "ch4": 2.08, "temp": 27.17, "riskScore": 0.4392, "risk": "Medium" }, { "date": "2024-05-08", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Wed", "season": "Spring", "pm25": 37.9, "pm10": 52.44, "co": 1.15, "nox": 51.0, "no2": 14.11, "so2": 8.99, "vocs": 100.74, "co2": 396.89, "ch4": 2.06, "temp": 26.02, "riskScore": 0.226, "risk": "Low" }, { "date": "2024-05-09", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Thu", "season": "Spring", "pm25": 47.21, "pm10": 62.54, "co": 1.41, "nox": 38.57, "no2": 15.76, "so2": 8.19, "vocs": 73.79, "co2": 399.7, "ch4": 1.84, "temp": 27.9, "riskScore": 0.2967, "risk": "Low" }, { "date": "2024-05-10", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Fri", "season": "Spring", "pm25": 51.38, "pm10": 57.57, "co": 1.84, "nox": 31.12, "no2": 19.28, "so2": 11.17, "vocs": 104.07, "co2": 397.42, "ch4": 1.92, "temp": 34.32, "riskScore": 0.3249, "risk": "Low" }, { "date": "2024-05-11", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Sat", "season": "Spring", "pm25": 46.82, "pm10": 75.37, "co": 1.36, "nox": 22.17, "no2": 18.54, "so2": 12.17, "vocs": 74.8, "co2": 392.32, "ch4": 2.16, "temp": 26.32, "riskScore": 0.3173, "risk": "Low" }, { "date": "2024-05-12", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Sun", "season": "Spring", "pm25": 33.91, "pm10": 88.1, "co": 2.32, "nox": 27.63, "no2": 15.65, "so2": 8.0, "vocs": 128.11, "co2": 378.65, "ch4": 1.81, "temp": 28.96, "riskScore": 0.3293, "risk": "Low" }, { "date": "2024-05-13", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Mon", "season": "Spring", "pm25": 43.72, "pm10": 40.85, "co": 1.6, "nox": 27.25, "no2": 19.37, "so2": 7.22, "vocs": 106.05, "co2": 389.88, "ch4": 1.86, "temp": 29.98, "riskScore": 0.2495, "risk": "Low" }, { "date": "2024-05-14", "year": 2024, "month": 5, "monthLabel": "May 2024", "dow": "Tue", "season": "Spring", "pm25": 43.14, "pm10": 34.29, "co": 1.63, "nox": 4.29, "no2": 5.12, "so2": 7.42, "vocs": 93.33, "co2": 388.03, "ch4": 2.06, "temp": 26.65, "riskScore": 0.2361, "risk": "Low" }];
+
+    const SEASON_ORDER = ["Spring", "Winter", "Summer", "Autumn"];
+    const DOW_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const RISK_ORDER = ["Low", "Medium", "High", "Critical"];
+    const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const SEASON_COLORS = { Spring: "#2ca02c", Winter: "#1f77b4", Summer: "#ff7f0e", Autumn: "#8c564b" };
+    const RISK_COLORS = { Low: "#2e7d32", Medium: "#f9a825", High: "#ef6c00", Critical: "#c62828" };
+
+    function mean(values) {
+      return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+    }
+    function fmt(value, digits = 1) {
+      return Number(value).toFixed(digits);
+    }
+    function fmtInt(value) {
+      return Number(value).toLocaleString();
+    }
+    function setText(id, value) {
+      document.getElementById(id).textContent = value;
+    }
+    function filterValue(id) {
+      const value = document.getElementById(id).value;
+      return value === "all" || value === "" ? null : value;
+    }
+
+    class Dashboard {
+      constructor(data) {
+        this.raw = data;
+        this.filtered = data;
+        this.charts = {};
+        this.sortCol = "date";
+        this.sortDir = "desc";
+        this.page = 0;
+        this.pageSize = 25;
+        this.init();
+      }
+
+      init() {
+        this.populateFilters();
+        this.bindEvents();
+        this.createCharts();
+        this.applyFilters();
+      }
+
+      populateFilters() {
+        const monthSelect = document.getElementById("filter-month");
+        MONTH_NAMES.forEach((name, index) => {
+          const option = document.createElement("option");
+          option.value = String(index + 1);
+          option.textContent = name;
+          monthSelect.appendChild(option);
+        });
+
+        const yearSelect = document.getElementById("filter-year");
+        [...new Set(this.raw.map(d => d.year))].sort().forEach(year => {
+          const option = document.createElement("option");
+          option.value = String(year);
+          option.textContent = String(year);
+          yearSelect.appendChild(option);
+        });
+
+        const dates = this.raw.map(d => d.date).sort();
+        const start = document.getElementById("filter-start");
+        const end = document.getElementById("filter-end");
+        start.min = end.min = dates[0];
+        start.max = end.max = dates[dates.length - 1];
+        setText("data-date", dates[dates.length - 1]);
+      }
+
+      bindEvents() {
+        ["filter-season", "filter-risk", "filter-month", "filter-year", "filter-start", "filter-end"].forEach(id => {
+          document.getElementById(id).addEventListener("change", () => this.applyFilters());
+        });
+        document.getElementById("reset-filters").addEventListener("click", () => {
+          ["filter-season", "filter-risk", "filter-month", "filter-year"].forEach(id => {
+            document.getElementById(id).value = "all";
+          });
+          document.getElementById("filter-start").value = "";
+          document.getElementById("filter-end").value = "";
+          this.applyFilters();
+        });
+        document.getElementById("page-prev").addEventListener("click", () => {
+          if (this.page > 0) { this.page -= 1; this.renderTable(); }
+        });
+        document.getElementById("page-next").addEventListener("click", () => {
+          const pages = Math.max(1, Math.ceil(this.filtered.length / this.pageSize));
+          if (this.page < pages - 1) { this.page += 1; this.renderTable(); }
+        });
+      }
+
+      applyFilters() {
+        const season = filterValue("filter-season");
+        const risk = filterValue("filter-risk");
+        const month = filterValue("filter-month");
+        const year = filterValue("filter-year");
+        const start = filterValue("filter-start");
+        const end = filterValue("filter-end");
+
+        this.filtered = this.raw.filter(row => {
+          if (season && row.season !== season) return false;
+          if (risk && row.risk !== risk) return false;
+          if (month && row.month !== Number(month)) return false;
+          if (year && row.year !== Number(year)) return false;
+          if (start && row.date < start) return false;
+          if (end && row.date > end) return false;
+          return true;
+        });
+
+        this.page = 0;
+        this.renderKPIs();
+        this.updateCharts();
+        this.renderTable();
+      }
+
+      renderKPIs() {
+        const data = this.filtered;
+        const avg = mean(data.map(d => d.pm25));
+        const peak = data.length ? Math.max(...data.map(d => d.pm25)) : 0;
+        const critical = data.filter(d => d.risk === "Critical").length;
+        const highPlus = data.filter(d => d.risk === "High" || d.risk === "Critical").length;
+        const avgRisk = mean(data.map(d => d.riskScore));
+
+        setText("kpi-days", fmtInt(data.length));
+        setText("kpi-days-sub", `of ${this.raw.length} total rows`);
+        setText("kpi-avg", fmt(avg));
+        setText("kpi-avg-sub", "µg/m³ · filtered view");
+        setText("kpi-peak", fmt(peak));
+        setText("kpi-peak-sub", "µg/m³ · single-day max");
+        setText("kpi-critical", fmtInt(critical));
+        setText("kpi-critical-sub", data.length ? `${fmt(critical / data.length * 100)}% of days` : "0% of days");
+        setText("kpi-risk", fmt(avgRisk, 2));
+        setText("kpi-risk-sub", data.length ? `${fmt(highPlus / data.length * 100)}% High + Critical` : "0% High + Critical");
+      }
+
+      createCharts() {
+        Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        Chart.defaults.color = "#64748b";
+        Chart.defaults.animation = false;
+
+        this.charts.trend = new Chart(document.getElementById("trend-chart"), {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "PM2.5",
+                data: [],
+                borderColor: "#4C72B0",
+                backgroundColor: "rgba(76, 114, 176, 0.10)",
+                borderWidth: 1.8,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                fill: true,
+                tension: 0.25
+              },
+              {
+                label: "75 µg/m³",
+                data: [],
+                borderColor: "#DD8452",
+                borderDash: [6, 4],
+                borderWidth: 1.4,
+                pointRadius: 0,
+                fill: false
+              },
+              {
+                label: "100 µg/m³",
+                data: [],
+                borderColor: "#C44E52",
+                borderDash: [6, 4],
+                borderWidth: 1.4,
+                pointRadius: 0,
+                fill: false
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+              legend: { position: "top", labels: { usePointStyle: true, boxWidth: 8, padding: 16 } },
+              tooltip: {
+                callbacks: {
+                  label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)} µg/m³`
+                }
+              }
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { maxTicksLimit: 12, maxRotation: 0 } },
+              y: { beginAtZero: true, title: { display: true, text: "PM2.5 (µg/m³)" } }
+            }
+          }
+        });
+
+        this.charts.season = new Chart(document.getElementById("season-chart"), {
+          type: "bar",
+          data: { labels: [], datasets: [{ label: "Average PM2.5", data: [], backgroundColor: [], borderRadius: 4 }] },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: ctx => `${fmt(ctx.parsed.y)} µg/m³` } }
+            },
+            scales: {
+              x: { grid: { display: false } },
+              y: { beginAtZero: true, title: { display: true, text: "PM2.5 (µg/m³)" } }
+            }
+          }
+        });
+
+        this.charts.risk = new Chart(document.getElementById("risk-chart"), {
+          type: "doughnut",
+          data: {
+            labels: RISK_ORDER,
+            datasets: [{
+              data: [0, 0, 0, 0],
+              backgroundColor: RISK_ORDER.map(r => RISK_COLORS[r]),
+              borderColor: "#ffffff",
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "62%",
+            plugins: {
+              legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8, padding: 14 } },
+              tooltip: {
+                callbacks: {
+                  label: ctx => {
+                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                    const pct = total ? (ctx.parsed / total * 100).toFixed(1) : "0.0";
+                    return `${ctx.label}: ${ctx.parsed} days (${pct}%)`;
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        this.charts.weekday = new Chart(document.getElementById("weekday-chart"), {
+          type: "bar",
+          data: { labels: DOW_ORDER, datasets: [{ label: "Average PM2.5", data: [], backgroundColor: "#4C72B0CC", borderColor: "#4C72B0", borderWidth: 1, borderRadius: 4 }] },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: ctx => `${fmt(ctx.parsed.y)} µg/m³` } }
+            },
+            scales: {
+              x: { grid: { display: false } },
+              y: { beginAtZero: true, title: { display: true, text: "PM2.5 (µg/m³)" } }
+            }
+          }
+        });
+
+        this.charts.month = new Chart(document.getElementById("month-chart"), {
+          type: "line",
+          data: { labels: [], datasets: [{ label: "Monthly average", data: [], borderColor: "#2ca02c", backgroundColor: "rgba(44, 160, 44, 0.10)", fill: true, tension: 0.25, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2 }] },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: ctx => `${fmt(ctx.parsed.y)} µg/m³` } }
+            },
+            scales: {
+              x: { grid: { display: false } },
+              y: { beginAtZero: true, title: { display: true, text: "PM2.5 (µg/m³)" } }
+            }
+          }
+        });
+      }
+
+      updateCharts() {
+        const data = this.filtered;
+        const ascending = [...data].sort((a, b) => a.date.localeCompare(b.date));
+
+        this.charts.trend.data.labels = ascending.map(d => d.date);
+        this.charts.trend.data.datasets[0].data = ascending.map(d => d.pm25);
+        this.charts.trend.data.datasets[1].data = ascending.map(() => 75);
+        this.charts.trend.data.datasets[2].data = ascending.map(() => 100);
+        this.charts.trend.update("none");
+
+        const seasons = SEASON_ORDER.filter(s => data.some(d => d.season === s));
+        this.charts.season.data.labels = seasons;
+        this.charts.season.data.datasets[0].data = seasons.map(s => mean(data.filter(d => d.season === s).map(d => d.pm25)));
+        this.charts.season.data.datasets[0].backgroundColor = seasons.map(s => SEASON_COLORS[s] + "CC");
+        this.charts.season.update("none");
+
+        this.charts.risk.data.datasets[0].data = RISK_ORDER.map(r => data.filter(d => d.risk === r).length);
+        this.charts.risk.update("none");
+
+        this.charts.weekday.data.datasets[0].data = DOW_ORDER.map(day => mean(data.filter(d => d.dow === day).map(d => d.pm25)));
+        this.charts.weekday.update("none");
+
+        const months = new Map();
+        data.forEach(row => {
+          if (!months.has(row.monthLabel)) months.set(row.monthLabel, { sum: 0, count: 0, first: row.date });
+          const bucket = months.get(row.monthLabel);
+          bucket.sum += row.pm25;
+          bucket.count += 1;
+          if (row.date < bucket.first) bucket.first = row.date;
+        });
+        const monthRows = [...months.entries()].sort((a, b) => a[1].first.localeCompare(b[1].first));
+        this.charts.month.data.labels = monthRows.map(entry => entry[0]);
+        this.charts.month.data.datasets[0].data = monthRows.map(entry => entry[1].sum / entry[1].count);
+        this.charts.month.update("none");
+      }
+
+      renderTable() {
+        const columns = [
+          { field: "date", label: "Date" },
+          { field: "season", label: "Season" },
+          { field: "dow", label: "Day" },
+          { field: "pm25", label: "PM2.5" },
+          { field: "pm10", label: "PM10" },
+          { field: "co", label: "CO" },
+          { field: "riskScore", label: "Risk Score" },
+          { field: "risk", label: "Risk" }
+        ];
+
+        const sorted = [...this.filtered].sort((a, b) => {
+          const aVal = a[this.sortCol];
+          const bVal = b[this.sortCol];
+          let cmp;
+          if (typeof aVal === "number" && typeof bVal === "number") {
+            cmp = aVal - bVal;
+          } else {
+            cmp = String(aVal).localeCompare(String(bVal));
+          }
+          return this.sortDir === "asc" ? cmp : -cmp;
+        });
+
+        const total = sorted.length;
+        const pages = Math.max(1, Math.ceil(total / this.pageSize));
+        if (this.page >= pages) this.page = pages - 1;
+        const start = this.page * this.pageSize;
+        const rows = sorted.slice(start, start + this.pageSize);
+
+        let html = '<table class="data-table"><thead><tr>';
+        columns.forEach(col => {
+          const arrow = this.sortCol === col.field ? (this.sortDir === "asc" ? " ▲" : " ▼") : "";
+          html += `<th data-field="${col.field}">${col.label}${arrow}</th>`;
+        });
+        html += "</tr></thead><tbody>";
+
+        if (!rows.length) {
+          html += `<tr><td colspan="${columns.length}" style="text-align:center;color:#64748b;padding:24px">No rows match the current filters.</td></tr>`;
+        } else {
+          rows.forEach(row => {
+            html += "<tr>";
+            html += `<td>${row.date}</td>`;
+            html += `<td>${row.season}</td>`;
+            html += `<td>${row.dow}</td>`;
+            html += `<td>${fmt(row.pm25)}</td>`;
+            html += `<td>${fmt(row.pm10)}</td>`;
+            html += `<td>${fmt(row.co, 2)}</td>`;
+            html += `<td>${fmt(row.riskScore, 3)}</td>`;
+            html += `<td><span class="badge badge-${row.risk.toLowerCase()}">${row.risk}</span></td>`;
+            html += "</tr>";
+          });
+        }
+        html += "</tbody></table>";
+
+        const container = document.getElementById("table-container");
+        container.innerHTML = html;
+        container.querySelectorAll("th[data-field]").forEach(th => {
+          th.addEventListener("click", () => {
+            const field = th.getAttribute("data-field");
+            if (this.sortCol === field) {
+              this.sortDir = this.sortDir === "asc" ? "desc" : "asc";
+            } else {
+              this.sortCol = field;
+              this.sortDir = "desc";
+            }
+            this.renderTable();
+          });
+        });
+
+        const end = Math.min(start + this.pageSize, total);
+        document.getElementById("table-info").textContent = total
+          ? `Showing ${start + 1}–${end} of ${total} days`
+          : "No rows match the current filters";
+        document.getElementById("page-label").textContent = `Page ${this.page + 1} of ${pages}`;
+        document.getElementById("page-prev").disabled = this.page === 0;
+        document.getElementById("page-next").disabled = this.page >= pages - 1;
+      }
+    }
+
+    new Dashboard(DATA);
+  </script>
+</body>
+
+</html>
